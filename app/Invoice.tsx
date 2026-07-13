@@ -1,0 +1,294 @@
+"use client";
+
+import React, { forwardRef, useMemo } from "react";
+import "./invoice.css";
+import { COMPANY } from "./constants";
+import { InvoiceData } from "./types";
+import {
+  formatTanggal,
+  formatDicetak,
+  rupiah,
+  rekening,
+  hitungSubtotal,
+  hitungTotal,
+  statusInvoice,
+  terbilang,
+} from "./utils";
+
+type Props = {
+  data: InvoiceData;
+};
+
+const Invoice = forwardRef<HTMLDivElement, Props>(({ data }, ref) => {
+  const subtotal = useMemo(() => {
+    return hitungSubtotal(data.items);
+  }, [data.items]);
+
+  const total = useMemo(() => {
+    return hitungTotal(
+      subtotal,
+      data.diskon ?? 0,
+      data.pajak ?? 0,
+      data.biayaAdmin ?? 0
+    );
+  }, [subtotal, data.diskon, data.pajak, data.biayaAdmin]);
+
+  // Hitung total dibayar dari riwayat cicilan (jika ada)
+  const dibayar = data.riwayatPembayaran 
+    ? data.riwayatPembayaran.reduce((acc, curr) => acc + curr.jumlah, 0)
+    : (data.jumlahDibayar ?? 0);
+
+  const sisa = Math.max(total - dibayar, 0);
+  const status = statusInvoice(total, dibayar);
+
+  const badgeClass =
+    status === "LUNAS"
+      ? "status-badge paid"
+      : status === "SEBAGIAN"
+      ? "status-badge partial"
+      : "status-badge unpaid";
+
+  const badgeText =
+    status === "LUNAS"
+      ? "Lunas"
+      : status === "SEBAGIAN"
+      ? "Sebagian"
+      : "Belum Dibayar";
+
+  return (
+    <div className="invoice-page" ref={ref}>
+      <div className="sheet">
+        {/* HEADER */}
+        <header className="head">
+          <svg className="crescent" viewBox="0 0 100 100" fill="none">
+            <path
+              d="M62 15C48 20 40 34 40 50C40 66 48 80 62 85C45 88 28 76 24 58C20 38 32 20 51 15C55 14 58.5 14 62 15Z"
+              stroke="#ffffff"
+              strokeWidth={1.4}
+            />
+          </svg>
+
+          <div className="head-row">
+            <img 
+              src="/logo_header.png" 
+              alt="Logo" 
+              className="header-logo"
+              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+            />
+            <div className={badgeClass}>{badgeText}</div>
+          </div>
+
+          <h1 className="invoice-title">Invoice</h1>
+
+          <div className="invoice-meta">
+            <div>
+              <span>No. Invoice</span>
+              <b className="mono">{data.nomorInvoice}</b>
+            </div>
+            <div>
+              <span>Tanggal</span>
+              <b>{formatTanggal(data.tanggal)}</b>
+            </div>
+            <div>
+              <span>Referensi</span>
+              <b>{data.referensi || "—"}</b>
+            </div>
+          </div>
+        </header>
+
+        {/* BILLED TO */}
+        <section className="billed">
+          <div>
+            <div className="label">Ditagihkan kepada</div>
+            <div className="name">{data.namaCustomer || "Nama Customer"}</div>
+          </div>
+          <div className="billed-right">
+            <div className="label">Dicetak</div>
+            <div className="printed-at">{formatDicetak(data.dicetakPada)}</div>
+          </div>
+        </section>
+
+        {/* ITEMS TABLE */}
+        <section className="items">
+          <table>
+            <thead>
+              <tr>
+                <th>Deskripsi</th>
+                <th>Qty</th>
+                <th>Harga</th>
+                <th>Jumlah</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.items.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="empty-row">Belum ada item.</td>
+                </tr>
+              ) : (
+                data.items.map((item) => (
+                  <tr key={item.id}>
+                    <td className="item-name">
+                      {item.deskripsi || "-"}
+                      {item.subDeskripsi && (
+                        <span className="item-sub">{item.subDeskripsi}</span>
+                      )}
+                    </td>
+                    <td>{item.qty ?? "—"}</td>
+                    <td>
+                      {item.hargaSatuan != null
+                        ? rupiah(item.hargaSatuan)
+                        : "—"}
+                    </td>
+                    <td>{rupiah(item.jumlah)}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </section>
+
+        {/* TOTALS & TERBILANG — SIDE BY SIDE */}
+        <section className="summary-section">
+          <div className="terbilang-col">
+            <div className="title">Terbilang</div>
+            <div className="text">{terbilang(total)}</div>
+          </div>
+
+          <div className="totals-box">
+            <div className="totals-row">
+              <span>Subtotal</span>
+              <span>{rupiah(subtotal)}</span>
+            </div>
+
+            {(data.diskon ?? 0) > 0 && (
+              <div className="totals-row">
+                <span>Diskon</span>
+                <span>- {rupiah(data.diskon!)}</span>
+              </div>
+            )}
+
+            {(data.pajak ?? 0) > 0 && (
+              <div className="totals-row">
+                <span>Pajak</span>
+                <span>{rupiah(data.pajak!)}</span>
+              </div>
+            )}
+
+            {(data.biayaAdmin ?? 0) > 0 && (
+              <div className="totals-row">
+                <span>Biaya Admin</span>
+                <span>{rupiah(data.biayaAdmin!)}</span>
+              </div>
+            )}
+
+            <div className="totals-row grand">
+              <span>Total</span>
+              <span>{rupiah(total)}</span>
+            </div>
+
+            <div className="totals-row paid-summary">
+              <span>Sudah Dibayar</span>
+              <span>{rupiah(dibayar)}</span>
+            </div>
+
+            {/* Looping data riwayat pembayaran jika ada */}
+            {data.riwayatPembayaran && data.riwayatPembayaran.length > 0 && (
+              <div className="payment-history">
+                {data.riwayatPembayaran.map((bayar, index) => (
+                  <div 
+                    key={index} 
+                    className="totals-row payment-history-item"
+                  >
+                    <span>↳ {formatTanggal(bayar.tanggal as string)} — {bayar.bank || "Bank"}</span>
+                    <span>{rupiah(bayar.jumlah)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="totals-row due">
+              <span>Sisa Tagihan</span>
+              <span>{rupiah(sisa)}</span>
+            </div>
+          </div>
+        </section>
+
+        {/* BANK ACCOUNTS */}
+        <section className="banks">
+          {data.rekeningBank.length === 0 ? (
+            <div className="bank-card empty-bank">
+              <span>Rekening Tujuan</span>
+              <b>Belum ada rekening.</b>
+            </div>
+          ) : (
+            data.rekeningBank.map((bank) => (
+              <div key={bank.id} className="bank-card">
+                <span>{bank.bank} a/n</span>
+                <b>{bank.atasNama}</b>
+                <div className="acc mono">{rekening(bank.nomorRekening)}</div>
+              </div>
+            ))
+          )}
+        </section>
+
+        <section className="invoice-note">
+          <div className="note-left">
+            <div className="note-title">Catatan</div>
+            <p>
+              Mohon melakukan pembayaran sesuai nominal invoice. Simpan bukti transfer dan kirimkan kepada admin EasyUmroh untuk proses verifikasi pembayaran.
+            </p>
+          </div>
+          <img 
+            src="/qreasyumroh.png" 
+            alt="QR Code" 
+            className="qr-image"
+            onError={(e) => { 
+              const target = e.target as HTMLImageElement;
+              target.style.display = 'none';
+              target.parentElement?.querySelector('.qr-fallback')?.classList.remove('qr-fallback');
+            }}
+          />
+          <div className="qr-fallback" style={{display:'none'}}>QR</div>
+        </section>
+
+        <footer className="footer">
+          <div className="footer-contact">
+            <img 
+              src="/logo_footer.png" 
+              alt="Logo" 
+              className="footer-logo"
+              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+            />
+            {COMPANY.alamat}
+            <br />
+            <a href={COMPANY.website} target="_blank" rel="noreferrer">
+              {COMPANY.website.replace("https://", "")}
+            </a>
+            {" · "}
+            <a href={`mailto:${COMPANY.email}`}>{COMPANY.email}</a>
+            {" · "}
+            <a href={`tel:${COMPANY.telepon.replace(/\s/g, "")}`}>
+              {COMPANY.telepon}
+            </a>
+          </div>
+
+          <div className="sign">
+            <div className="sign-name">Anas Basuki</div>
+            <img 
+              src="/ttdanas.png" 
+              alt="Tanda Tangan" 
+              className="sign-image"
+              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+            />
+            <div className="sign-line" />
+            <span>Accounting</span>
+          </div>
+        </footer>
+      </div>
+    </div>
+  );
+});
+
+Invoice.displayName = "Invoice";
+
+export default Invoice;

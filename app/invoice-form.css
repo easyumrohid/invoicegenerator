@@ -1,0 +1,214 @@
+/* ── FORM PANEL ─────────────────────────────── */
+
+.form-panel {
+  padding: 24px;
+  background: #ffffff;
+  color: #1a1a2e;
+  font-family: var(--font-jakarta);
+}
+
+.form-panel h1 {
+  font-size: 22px;
+  font-weight: 700;
+  color: #051d76;
+  margin-bottom: 4px;
+}
+
+.form-panel .hint {
+  font-size: 13px;
+  color: #7783a8;
+  line-height: 1.6;
+  margin-bottom: 24px;
+}
+
+/* ── SECTION TITLE ──────────────────────────── */
+
+.section-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #7783a8;
+  margin: 24px 0 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e3e7f3;
+}
+
+/* ── LABEL & INPUT ──────────────────────────── */
+
+.form-panel label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: #4a5568;
+  margin-bottom: 14px;
+}
+
+.form-panel input,
+.form-panel select {
+  display: block;
+  width: 100%;
+  margin-top: 6px;
+  padding: 10px 12px;
+  font-size: 14px;
+  color: #1a1a2e;
+  background: #f8f9fc;
+  border: 1px solid #d0d5e4;
+  border-radius: 8px;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  box-sizing: border-box;
+}
+
+.form-panel input:focus,
+.form-panel select:focus {
+  border-color: #0d5bd7;
+  box-shadow: 0 0 0 3px rgba(13, 91, 215, 0.1);
+}
+
+.form-panel input::placeholder {
+  color: #a0aec0;
+}
+
+.form-panel input[type="number"] {
+  appearance: textfield;
+}
+
+.form-panel input[type="number"]::-webkit-inner-spin-button,
+.form-panel input[type="number"]::-webkit-outer-spin-button {
+  appearance: none;
+}
+
+.form-panel input[readonly] {
+  background: #e8eaf0;
+  color: #7783a8;
+  cursor: not-allowed;
+}
+
+/* ── ITEM ROW ───────────────────────────────── */
+
+.item-row {
+  background: #f8f9fc;
+  border: 1px solid #e3e7f3;
+  border-radius: 10px;
+  padding: 14px;
+  margin-bottom: 12px;
+}
+
+.item-row-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+/* ── BUTTONS ────────────────────────────────── */
+
+.add-btn,
+.remove-btn,
+.print-btn,
+.download-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 12px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.add-btn {
+  width: 100%;
+  background: #0d5bd7;
+  color: #fff;
+  margin-bottom: 16px;
+}
+
+.add-btn:hover {
+  background: #0a4bb0;
+}
+
+.remove-btn {
+  width: 100%;
+  background: #fff0f0;
+  color: #c0392b;
+  border: 1px solid #f5c6cb;
+  margin-top: 10px;
+}
+
+.remove-btn:hover {
+  background: #ffe0e0;
+}
+
+.print-btn {
+  flex: 1;
+  background: #f0f4ff;
+  color: #0d5bd7;
+  border: 1px solid #c7d5f9;
+}
+
+.print-btn:hover {
+  background: #e0e8ff;
+}
+
+.download-btn {
+  flex: 1;
+  background: #0d5bd7;
+  color: #fff;
+}
+
+.download-btn:hover {
+  background: #0a4bb0;
+}
+
+.clear-btn {
+  width: 100%;
+  margin-top: 10px;
+  padding: 10px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 8px;
+  border: 1px solid #f5c6cb;
+  background: #fff0f0;
+  color: #c0392b;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.clear-btn:hover {
+  background: #ffe0e0;
+}
+
+.btn-group {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+/* ── ACTION BAR (sticky bottom) ─────────────── */
+
+.action-bar {
+  position: sticky;
+  bottom: 0;
+  background: #ffffff;
+  padding: 16px 0;
+  border-top: 1px solid #e3e7f3;
+  margin-top: 8px;
+}
+
+/* ── PRINT HIDE ─────────────────────────────── */
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+}
