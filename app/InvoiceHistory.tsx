@@ -233,7 +233,7 @@ export default function InvoiceHistory({ onLoadInvoice, onClose }: Props) {
                               <div style={{ fontSize: "11px", fontWeight: 700, color: "#7783a8", textTransform: "uppercase", marginBottom: "4px" }}>Riwayat Cicilan:</div>
                               {h.data.riwayatPembayaran.map((p, i) => (
                                 <div key={i} style={{ fontSize: "12px", color: "#4a5568", padding: "2px 0" }}>
-                                  {i + 1}. {p.tanggal} — {p.bank} — {rupiah(p.jumlah)}
+                                  {i + 1}. {String(p.tanggal)} — {p.bank} — {rupiah(p.jumlah)}
                                 </div>
                               ))}
                             </div>
