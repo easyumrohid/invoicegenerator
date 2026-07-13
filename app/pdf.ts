@@ -81,12 +81,7 @@ async function elementToPDF(
         top: "0",
       },
       scale: 2,
-      disableEmbedFonts: true,
-      filterUrls: (url: string) => {
-        return !url.includes("Inter") && !url.includes("inter");
-      },
-      logger: {},
-    });
+    } as any);
 
     const pdf = new jsPDF({
       orientation: "portrait",
