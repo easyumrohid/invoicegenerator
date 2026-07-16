@@ -44,8 +44,8 @@ const createDefaultInvoice = (): InvoiceData => ({
 });
 
 export default function Home() {
-  const invoiceRef = useRef<HTMLDivElement>(null);
-  const kwitansiRef = useRef<HTMLDivElement>(null);
+  const invoiceRef = useRef<HTMLDivElement>(null!);
+  const kwitansiRef = useRef<HTMLDivElement>(null!);
   const [data, setData] = useState<InvoiceData>(createDefaultInvoice);
   const [loaded, setLoaded] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -104,7 +104,11 @@ export default function Home() {
   useEffect(() => {
     if (!loaded || !data.tanggal) return;
     // If nomorInvoice is empty or doesn't match the current date, regenerate
-    const expectedPrefix = `INV-${data.tanggal.replace(/-/g, "")}`;
+    // Format nomor: INV-DDMMYYYY-XXXX (sesuai generateInvoiceNumber)
+    const d = new Date(data.tanggal);
+    const expectedPrefix = `INV-${String(d.getDate()).padStart(2, "0")}${String(
+      d.getMonth() + 1
+    ).padStart(2, "0")}${d.getFullYear()}`;
     if (!data.nomorInvoice || !data.nomorInvoice.startsWith(expectedPrefix)) {
       setData((prev) => ({
         ...prev,
@@ -126,8 +130,8 @@ export default function Home() {
   const subtotal = data.items.reduce((t, i) => t + i.jumlah, 0);
   const total = subtotal - (data.diskon ?? 0) + (data.pajak ?? 0) + (data.biayaAdmin ?? 0);
   const dibayar = data.riwayatPembayaran
-    ? data.riwayatPembayaran.reduce((acc, curr) => acc + curr.jumlah, 0)
-    : (data.jumlahDibayar ?? 0);
+    ? data.riwayatPembayaran.reduce((acc, curr) => acc + (Number(curr.jumlah) || 0), 0)
+    : (Number(data.jumlahDibayar) || 0);
   const isLunas = dibayar >= total && total > 0;
 
   return (

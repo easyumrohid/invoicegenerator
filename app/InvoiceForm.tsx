@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import "@/app/invoice-form.css";
 import { exportPDF, exportKwitansiPDF } from "./pdf";
 import { BANK_OPTIONS } from "./constants";
-import { generateInvoiceNumber, generateKwitansiNumber } from "./utils";
+import { generateInvoiceNumber, generateKwitansiNumber, resetInvoiceNumber } from "./utils";
 import { saveToHistory } from "./storage";
 import type { InvoiceData } from "./types";
 import { hitungSubtotal, hitungTotal, statusInvoice } from "./utils";
@@ -28,6 +28,15 @@ export default function InvoiceForm({ data, setData, invoiceRef, kwitansiRef, is
   // --- HANDLER INPUT DASAR ---
   const handleChange = (field: keyof InvoiceData, value: string | number) => {
     setData({ ...data, [field]: value });
+  };
+
+  // --- HELPER INPUT ANGKA ---
+  // Hanya izinkan digit 0-9: karakter "-", ".", "e" tidak bisa masuk,
+  // sehingga nilai negatif/desimal/NaN tidak pernah tercipta saat mengedit.
+  const onlyDigits = (v: string) => v.replace(/[^\d]/g, "");
+  const parseAngka = (v: string) => {
+    const digits = onlyDigits(v);
+    return digits === "" ? 0 : Number(digits);
   };
 
   // --- HANDLER ITEMS ---
@@ -110,8 +119,8 @@ export default function InvoiceForm({ data, setData, invoiceRef, kwitansiRef, is
       const subtotal = updatedData.items.reduce((t, i) => t + i.jumlah, 0);
       const total = hitungTotal(subtotal, updatedData.diskon ?? 0, updatedData.pajak ?? 0, updatedData.biayaAdmin ?? 0);
       const dibayar = updatedData.riwayatPembayaran
-        ? updatedData.riwayatPembayaran.reduce((acc, curr) => acc + curr.jumlah, 0)
-        : (updatedData.jumlahDibayar ?? 0);
+        ? updatedData.riwayatPembayaran.reduce((acc, curr) => acc + (Number(curr.jumlah) || 0), 0)
+        : (Number(updatedData.jumlahDibayar) || 0);
       const status = statusInvoice(total, dibayar);
       saveToHistory(updatedData, total, dibayar, status);
     } catch (err) {
@@ -124,10 +133,21 @@ export default function InvoiceForm({ data, setData, invoiceRef, kwitansiRef, is
 
   // --- HANDLER CLEAR ALL ---
   const handleClearAll = () => {
-    if (confirm("Yakin ingin mengosongkan semua item dan riwayat pembayaran?")) {
+    if (confirm("Yakin ingin mengosongkan semua data?")) {
+      const tgl = new Date().toISOString().slice(0, 10);
       setData({
         ...data,
-        items: [],
+        nomorInvoice: resetInvoiceNumber(tgl),
+        tanggal: tgl,
+        namaCustomer: "",
+        items: [{
+          id: crypto.randomUUID(),
+          deskripsi: "",
+          subDeskripsi: "",
+          qty: 1,
+          hargaSatuan: 0,
+          jumlah: 0,
+        }],
         riwayatPembayaran: [],
         diskon: 0,
         pajak: 0,
@@ -269,17 +289,19 @@ export default function InvoiceForm({ data, setData, invoiceRef, kwitansiRef, is
             <label>
               Qty
               <input
-                type="number"
+                type="text"
+                inputMode="numeric"
                 value={item.qty || ""}
-                onChange={(e) => updateItem(index, "qty", Number(e.target.value))}
+                onChange={(e) => updateItem(index, "qty", parseAngka(e.target.value))}
               />
             </label>
             <label>
               Harga Satuan
               <input
-                type="number"
+                type="text"
+                inputMode="numeric"
                 value={item.hargaSatuan || ""}
-                onChange={(e) => updateItem(index, "hargaSatuan", Number(e.target.value))}
+                onChange={(e) => updateItem(index, "hargaSatuan", parseAngka(e.target.value))}
               />
             </label>
           </div>
@@ -323,10 +345,11 @@ export default function InvoiceForm({ data, setData, invoiceRef, kwitansiRef, is
             <label>
               Jumlah (Rp)
               <input
-                type="number"
+                type="text"
+                inputMode="numeric"
                 placeholder="0"
                 value={bayar.jumlah || ""}
-                onChange={(e) => updatePembayaran(index, "jumlah", Number(e.target.value))}
+                onChange={(e) => updatePembayaran(index, "jumlah", parseAngka(e.target.value))}
               />
             </label>
           </div>
@@ -346,25 +369,28 @@ export default function InvoiceForm({ data, setData, invoiceRef, kwitansiRef, is
         <label>
           Diskon (Rp)
           <input
-            type="number"
+            type="text"
+            inputMode="numeric"
             value={data.diskon || ""}
-            onChange={(e) => handleChange("diskon", Number(e.target.value))}
+            onChange={(e) => handleChange("diskon", parseAngka(e.target.value))}
           />
         </label>
         <label>
           Pajak (Rp)
           <input
-            type="number"
+            type="text"
+            inputMode="numeric"
             value={data.pajak || ""}
-            onChange={(e) => handleChange("pajak", Number(e.target.value))}
+            onChange={(e) => handleChange("pajak", parseAngka(e.target.value))}
           />
         </label>
         <label>
           Biaya Admin (Rp)
           <input
-            type="number"
+            type="text"
+            inputMode="numeric"
             value={data.biayaAdmin || ""}
-            onChange={(e) => handleChange("biayaAdmin", Number(e.target.value))}
+            onChange={(e) => handleChange("biayaAdmin", parseAngka(e.target.value))}
           />
         </label>
       </div>

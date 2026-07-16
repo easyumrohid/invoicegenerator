@@ -35,8 +35,8 @@ const Invoice = forwardRef<HTMLDivElement, Props>(({ data }, ref) => {
 
   // Hitung total dibayar dari riwayat cicilan (jika ada)
   const dibayar = data.riwayatPembayaran 
-    ? data.riwayatPembayaran.reduce((acc, curr) => acc + curr.jumlah, 0)
-    : (data.jumlahDibayar ?? 0);
+    ? data.riwayatPembayaran.reduce((acc, curr) => acc + (Number(curr.jumlah) || 0), 0)
+    : (Number(data.jumlahDibayar) || 0);
 
   const sisa = Math.max(total - dibayar, 0);
   const status = statusInvoice(total, dibayar);

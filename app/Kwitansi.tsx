@@ -27,8 +27,8 @@ const Kwitansi = forwardRef<HTMLDivElement, Props>(({ data }, ref) => {
   );
 
   const dibayar = data.riwayatPembayaran
-    ? data.riwayatPembayaran.reduce((acc, curr) => acc + curr.jumlah, 0)
-    : (data.jumlahDibayar ?? 0);
+    ? data.riwayatPembayaran.reduce((acc, curr) => acc + (Number(curr.jumlah) || 0), 0)
+    : (Number(data.jumlahDibayar) || 0);
 
   const nomorKwitansi = generateKwitansiNumber(data.nomorInvoice);
 

@@ -19,6 +19,7 @@ export function formatTanggal(
   if (!iso) return "-";
 
   const date = new Date(iso);
+  if (isNaN(date.getTime())) return "-";
 
   return date.toLocaleDateString("id-ID", {
     day: "numeric",
@@ -46,11 +47,12 @@ export function formatDicetak(
 export function rupiah(
   value: number
 ) {
+  const n = Number(value);
   return new Intl.NumberFormat("id-ID", {
     style: "currency",
     currency: "IDR",
     maximumFractionDigits: 0,
-  }).format(value);
+  }).format(Number.isFinite(n) ? n : 0);
 }
 
 export function rekening(
@@ -68,7 +70,7 @@ export function hitungSubtotal(
   }[]
 ) {
   return items.reduce(
-    (t, i) => t + i.jumlah,
+    (t, i) => t + (Number(i.jumlah) || 0),
     0
   );
 }
@@ -79,7 +81,12 @@ export function hitungTotal(
   pajak = 0,
   admin = 0
 ) {
-  return subtotal - diskon + pajak + admin;
+  return (
+    (Number(subtotal) || 0) -
+    (Number(diskon) || 0) +
+    (Number(pajak) || 0) +
+    (Number(admin) || 0)
+  );
 }
 
 export function statusInvoice(
@@ -131,6 +138,44 @@ export function generateInvoiceNumber(tanggal?: string) {
   return `INV-${dateStr}-${String(counter).padStart(4, "0")}`;
 }
 
+// ── RESET INVOICE NUMBER: cek history, lanjutkan nomor terakhir atau mulai dari 0001 ──
+
+export function resetInvoiceNumber(tanggal?: string): string {
+  const date = tanggal ? new Date(tanggal) : new Date();
+  const d = String(date.getDate()).padStart(2, "0");
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const y = date.getFullYear();
+  const dateStr = `${d}${m}${y}`;
+  const prefix = `INV-${dateStr}-`;
+
+  // Cek history untuk invoice di tanggal yang sama
+  let maxCounter = 0;
+  if (typeof window !== "undefined") {
+    const raw = localStorage.getItem("easyumroh_invoices_history");
+    if (raw) {
+      try {
+        const history = JSON.parse(raw) as { nomorInvoice: string; tanggal: string }[];
+        for (const h of history) {
+          if (h.nomorInvoice?.startsWith(prefix)) {
+            const suffix = h.nomorInvoice.replace(prefix, "");
+            const num = parseInt(suffix, 10);
+            if (!isNaN(num) && num > maxCounter) {
+              maxCounter = num;
+            }
+          }
+        }
+      } catch {
+        // ignore parse error
+      }
+    }
+  }
+
+  const nextCounter = maxCounter + 1;
+  saveCounter(dateStr, nextCounter);
+
+  return `${prefix}${String(nextCounter).padStart(4, "0")}`;
+}
+
 export function generateKwitansiNumber(invoiceNumber: string): string {
   return invoiceNumber.replace("INV-", "KWT-");
 }
@@ -151,7 +196,7 @@ const angka = [
 ];
 
 function penyebut(n: number): string {
-  if (n < 12) return angka[n];
+  if (n < 12) return angka[n] ?? "";
   if (n < 20) return `${penyebut(n - 10)} Belas`;
   if (n < 100)
     return `${penyebut(Math.floor(n / 10))} Puluh ${penyebut(n % 10)}`;
@@ -178,9 +223,18 @@ function penyebut(n: number): string {
 }
 
 export function terbilang(nilai: number) {
-  if (nilai === 0) return "Nol Rupiah";
+  const n = Number(nilai);
 
-  return `${penyebut(nilai)
+  // Guard: NaN / Infinity / undefined tidak boleh membunuh render
+  if (!Number.isFinite(n)) return "Nol Rupiah";
+
+  // Bulatkan agar nilai desimal (mis. 1.5) tidak menghasilkan undefined
+  const bulat = Math.round(Math.abs(n));
+  if (bulat === 0) return "Nol Rupiah";
+
+  const hasil = `${penyebut(bulat) ?? ""}`
     .replace(/\s+/g, " ")
-    .trim()} Rupiah`;
+    .trim();
+
+  return `${n < 0 ? "Minus " : ""}${hasil} Rupiah`;
 }
