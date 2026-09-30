@@ -1,5 +1,5 @@
-Ganti tiga file app/DatabaseAccess.tsx, app/globals.css, dan app/database.css di proyek lokal dengan file dari ZIP ini.
-Pertahankan .env.local dan folder public yang sudah ada.
-Hentikan server dengan Ctrl+C, lalu jalankan npm run dev kembali.
-Tidak perlu menjalankan ulang SQL atau menghapus data browser.
-Perbaikan: tinggi bar login dihitung dalam layout, catatan draft di luar area scroll ikut diperhitungkan, tombol Buat INV Baru di bawah Download dapat dijangkau dengan scroll form.
+Ganti app/pdf.ts dan app/invoice.css pada proyek dengan dua file ini.
+Untuk lokal: hentikan lalu jalankan npm run dev.
+Untuk website: commit/push ke GitHub dan tunggu deployment Vercel terbaru.
+Unduh ulang PDF dari Riwayat. File PDF lama tidak berubah otomatis.
+Tidak perlu mengubah SQL atau konfigurasi Supabase.

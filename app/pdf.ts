@@ -13,7 +13,7 @@ async function elementToPDF(
 ) {
   // ── Buat wrapper dengan class & innerHTML dari elemen original ──
   const wrapper = document.createElement("div");
-  wrapper.className = element.className;
+  wrapper.className = `${element.className} pdf-export`;
   wrapper.innerHTML = element.innerHTML;
 
   // Isolate wrapper dari parent flexbox
@@ -22,6 +22,9 @@ async function elementToPDF(
     min-width: ${A4_WIDTH_PX}px !important;
     max-width: ${A4_WIDTH_PX}px !important;
     height: auto !important;
+    min-height: 0 !important;
+    -webkit-text-size-adjust: none !important;
+    text-size-adjust: none !important;
     background: #ffffff !important;
     position: fixed !important;
     top: -9999px !important;
@@ -68,7 +71,10 @@ async function elementToPDF(
   }));
 
   const width = A4_WIDTH_PX;
-  const height = Math.max(Math.ceil(wrapper.scrollHeight), A4_HEIGHT_PX);
+  const height = Math.ceil(wrapper.scrollHeight);
+  const origin = wrapper.getBoundingClientRect().top;
+  const blocks = Array.from(wrapper.querySelectorAll("tr, .footer, .invoice-note, .banks, .sign"))
+    .map(node => { const rect = node.getBoundingClientRect(); return {top: rect.top - origin, bottom: rect.bottom - origin}; });
 
     const dataUrl = await domtoimage.toPng(wrapper, {
       width: width,
@@ -102,17 +108,33 @@ async function elementToPDF(
     await img.decode();
 
 
-    // Crop the raster into page-sized slices, so content below A4 is retained.
-    const pagePixels = Math.round(img.width * pdfHeight / pdfWidth);
-    for (let top = 0; top < img.height; top += pagePixels) {
-      if (top > 0) pdf.addPage();
-      const canvas = document.createElement("canvas");
-      canvas.width = img.width;
-      canvas.height = Math.min(pagePixels, img.height - top);
-      const ctx = canvas.getContext("2d");
-      if (!ctx) throw new Error("Canvas tidak tersedia");
-      ctx.drawImage(img, 0, top, img.width, canvas.height, 0, 0, canvas.width, canvas.height);
-      pdf.addImage(canvas.toDataURL("image/png"), "PNG", 0, 0, pdfWidth, canvas.height * pdfWidth / img.width);
+    // Invoice normal dipertahankan utuh, termasuk footer. Sedikit kelebihan tinggi
+    // diperkecil secara proporsional; invoice panjang memakai batas antarblok.
+    if (height <= A4_HEIGHT_PX * 1.15) {
+      const imageWidth = Math.min(pdfWidth, pdfHeight * img.width / img.height);
+      pdf.addImage(dataUrl, "PNG", (pdfWidth - imageWidth) / 2, 0, imageWidth, img.height * imageWidth / img.width);
+    } else {
+      const scale = img.height / height;
+      const pagePixels = Math.ceil(img.width * pdfHeight / pdfWidth);
+      let top = 0;
+      while (top < img.height) {
+        let bottom = Math.min(top + pagePixels, img.height);
+        // Hindari memotong baris, catatan, rekening, dan footer/tanda tangan.
+        for (let pass = 0; pass < blocks.length; pass++) {
+          const crossing = blocks.filter(block => block.top * scale > top + 1 && block.top * scale < bottom && block.bottom * scale > bottom);
+          if (!crossing.length) break;
+          bottom = Math.floor(Math.min(...crossing.map(block => block.top * scale)));
+        }
+        if (top > 0) pdf.addPage();
+        const canvas = document.createElement("canvas");
+        canvas.width = img.width;
+        canvas.height = bottom - top;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) throw new Error("Canvas tidak tersedia");
+        ctx.drawImage(img, 0, top, img.width, canvas.height, 0, 0, canvas.width, canvas.height);
+        pdf.addImage(canvas.toDataURL("image/png"), "PNG", 0, 0, pdfWidth, Math.min(pdfHeight, canvas.height * pdfWidth / img.width));
+        top = bottom;
+      }
     }
 
     pdf.save(fileName);

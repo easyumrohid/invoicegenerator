@@ -457,13 +457,13 @@
 
 /* Mobile override */
 @media (max-width: 640px) {
-  .invoice-page .invoice-note {
+  .invoice-page:not(.pdf-export) .invoice-note {
     flex-direction: column;
     align-items: flex-start;
   }
 
-  .invoice-page .qr-image,
-  .invoice-page .qr-fallback {
+  .invoice-page:not(.pdf-export) .qr-image,
+  .invoice-page:not(.pdf-export) .qr-fallback {
     align-self: center;
   }
 }
