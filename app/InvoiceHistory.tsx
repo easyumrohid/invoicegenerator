@@ -1,9 +1,10 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { loadHistory, deleteFromHistory, clearHistory, exportCSV, downloadCSV } from "./storage";
+import { exportCSV, downloadCSV } from "./storage";
+import { loadCloudHistory, deleteCloudInvoices, databaseError } from "./database";
 import type { InvoiceHistoryItem } from "./storage";
-import { rupiah } from "./utils";
+import { rupiah, ringkasanPembayaran, tanggalDalamRentang, labelPembayaran } from "./utils";
 
 interface Props {
   onLoadInvoice: (data: InvoiceHistoryItem) => void;
@@ -11,14 +12,22 @@ interface Props {
 }
 
 export default function InvoiceHistory({ onLoadInvoice, onClose }: Props) {
+  const [busy, setBusy] = useState(true);
+  const [error, setError] = useState("");
   const [history, setHistory] = useState<InvoiceHistoryItem[]>([]);
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [filter, setFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState<"ALL" | "LUNAS" | "SEBAGIAN" | "BELUM_DIBAYAR">("ALL");
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  useEffect(() => {
-    setHistory(loadHistory());
-  }, []);
+  const refresh = async () => {
+    setBusy(true); setError("");
+    try {setHistory(await loadCloudHistory());}
+    catch(e) {setError(databaseError(e));}
+    finally {setBusy(false);}
+  };
+  useEffect(() => {let active = true; void loadCloudHistory().then(items => {if(active)setHistory(items);}).catch(e => {if(active)setError(databaseError(e));}).finally(()=>{if(active)setBusy(false);});return()=>{active=false;};}, []);
 
   const filtered = history.filter((h) => {
     const matchText =
@@ -26,17 +35,21 @@ export default function InvoiceHistory({ onLoadInvoice, onClose }: Props) {
       h.nomorInvoice.toLowerCase().includes(filter.toLowerCase()) ||
       h.namaCustomer.toLowerCase().includes(filter.toLowerCase());
     const matchStatus = statusFilter === "ALL" || h.status === statusFilter;
-    return matchText && matchStatus;
+    return matchText && matchStatus && tanggalDalamRentang(h.tanggal, dateFrom, dateTo);
   });
 
+  const paymentTotals = ringkasanPembayaran(filtered.map(h => h.data));
   const totalRevenue = filtered.reduce((sum, h) => sum + h.dibayar, 0);
-  const totalOutstanding = filtered.reduce((sum, h) => sum + (h.total - h.dibayar), 0);
+  const totalOutstanding = filtered.reduce((sum, h) => sum + Math.max(h.total - h.dibayar, 0), 0);
 
-  const handleDelete = (id: string) => {
-    if (confirm("Yakin hapus invoice ini dari riwayat?")) {
-      deleteFromHistory(id);
-      setHistory(loadHistory());
-    }
+  const handleDelete = async (items: InvoiceHistoryItem[]) => {
+    if (busy || !items.length || !confirm(`Hapus ${items.length} INV dari riwayat database? Pastikan arsip CSV sudah diunduh dan diperiksa. Catatan nomor INV tetap disimpan.`)) return;
+    setBusy(true); setError("");
+    try {
+      await deleteCloudInvoices(items);
+      await refresh();
+    } catch(e) {setError(databaseError(e));}
+    finally {setBusy(false);}
   };
 
   const handleExportCSV = () => {
@@ -69,7 +82,7 @@ export default function InvoiceHistory({ onLoadInvoice, onClose }: Props) {
   };
 
   const paymentProgress = (item: InvoiceHistoryItem) => {
-    const pct = item.total > 0 ? Math.round((item.dibayar / item.total) * 100) : 0;
+    const pct = item.total > 0 ? Math.min(100, Math.round((item.dibayar / item.total) * 100)) : 0;
     return (
       <div style={{ marginTop: "6px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: "#7783a8", marginBottom: "2px" }}>
@@ -112,12 +125,16 @@ export default function InvoiceHistory({ onLoadInvoice, onClose }: Props) {
       onClick={onClose}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="invoice-history-title"
         style={{
           background: "#fff",
           borderRadius: "16px",
           width: "100%",
           maxWidth: "900px",
-          maxHeight: "90vh",
+          maxHeight: "calc(100dvh - 40px)",
+          minHeight: 0,
           overflow: "hidden",
           display: "flex",
           flexDirection: "column",
@@ -126,16 +143,24 @@ export default function InvoiceHistory({ onLoadInvoice, onClose }: Props) {
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div style={{ padding: "20px 24px", borderBottom: "1px solid #e3e7f3", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div style={{ flexShrink: 0, padding: "20px 24px", borderBottom: "1px solid #e3e7f3", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
-            <h2 style={{ margin: 0, fontSize: "18px", color: "#051d76" }}>📋 Riwayat Invoice</h2>
+            <h2 id="invoice-history-title" style={{ margin: 0, fontSize: "18px", color: "#051d76" }}>📋 Riwayat Invoice</h2>
             <p style={{ margin: "4px 0 0", fontSize: "12px", color: "#7783a8" }}>Klik invoice untuk edit & tambah cicilan</p>
           </div>
           <button onClick={onClose} style={{ background: "none", border: "none", fontSize: "20px", cursor: "pointer", color: "#7783a8" }}>✕</button>
         </div>
 
+        <div
+          role="region"
+          aria-label="Isi riwayat invoice"
+          tabIndex={0}
+          style={{ flex: "1 1 auto", minHeight: 0, minWidth: 0, overflowY: "auto", overscrollBehavior: "contain" }}
+        >
+        {busy && <p role="status" style={{padding:"0 24px"}}>Memuat / menyimpan data…</p>}
+        {error && <p role="alert" style={{padding:"0 24px",color:"#c0392b"}}>{error}</p>}
         {/* Summary Cards */}
-        <div style={{ padding: "16px 24px", display: "flex", gap: "12px", background: "#f8f9fc" }}>
+        <div style={{ padding: "16px 24px", display: "flex", flexWrap: "wrap", gap: "12px", background: "#f8f9fc" }}>
           <div style={{ flex: 1, background: "#fff", padding: "14px", borderRadius: "10px", border: "1px solid #e3e7f3" }}>
             <div style={{ fontSize: "11px", color: "#7783a8", textTransform: "uppercase", fontWeight: 700, letterSpacing: "0.05em" }}>Total Invoice</div>
             <div style={{ fontSize: "20px", fontWeight: 800, color: "#051d76", marginTop: "4px" }}>{filtered.length}</div>
@@ -150,8 +175,22 @@ export default function InvoiceHistory({ onLoadInvoice, onClose }: Props) {
           </div>
         </div>
 
+        <div style={{padding: "0 24px 16px", display: "flex", flexWrap: "wrap", gap: "12px", background: "#f8f9fc"}}>
+          {Object.entries(paymentTotals).filter(([label, value]) => label !== "Lainnya" || value > 0).map(([label, value]) => (
+            <div key={label} style={{flex: "1 1 130px", background: "white", border: "1px solid #e3e7f3", padding: "12px", borderRadius: "10px"}}>
+              <div style={{fontSize: "12px", color: "#7783a8"}}>{label === "Lainnya" ? "Lainnya / Belum ditentukan" : label}</div>
+              <strong style={{color: "#051d76"}}>{rupiah(value)}</strong>
+            </div>
+          ))}
+        </div>
+        <div style={{padding:"12px 24px",display:"flex",flexWrap:"wrap",gap:"12px",alignItems:"end"}}>
+          <label>Dari tanggal invoice<input aria-label="Dari tanggal invoice" type="date" value={dateFrom} max={dateTo || undefined} onChange={e=>setDateFrom(e.target.value)} /></label>
+          <label>Sampai tanggal invoice<input aria-label="Sampai tanggal invoice" type="date" value={dateTo} min={dateFrom || undefined} onChange={e=>setDateTo(e.target.value)} /></label>
+          <button type="button" onClick={()=>{setDateFrom("");setDateTo("");}}>Reset Tanggal</button>
+          {dateFrom && dateTo && dateFrom > dateTo && <span role="alert">Tanggal akhir harus sesudah tanggal awal.</span>}
+        </div>
         {/* Filters */}
-        <div style={{ padding: "12px 24px", display: "flex", gap: "10px", borderBottom: "1px solid #e3e7f3" }}>
+        <div style={{ padding: "12px 24px", display: "flex", flexWrap: "wrap", gap: "10px", borderBottom: "1px solid #e3e7f3" }}>
           <input
             type="text"
             placeholder="Cari nomor invoice atau customer..."
@@ -170,22 +209,25 @@ export default function InvoiceHistory({ onLoadInvoice, onClose }: Props) {
             <option value="BELUM_DIBAYAR">Belum Dibayar</option>
           </select>
           <button
+            disabled={busy || Boolean(error) || !filtered.length}
             onClick={handleExportCSV}
             style={{ padding: "8px 14px", borderRadius: "8px", border: "1px solid #0d5bd7", background: "#f0f4ff", color: "#0d5bd7", fontSize: "12px", fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}
           >
             ⬇️ Export CSV
           </button>
+          <button disabled={busy} onClick={refresh}>Muat ulang</button>
+          <button disabled={busy || Boolean(error) || !filtered.length} onClick={()=>handleDelete(filtered)}>Hapus hasil filter</button>
         </div>
 
         {/* Table */}
-        <div style={{ flex: 1, overflow: "auto", padding: "0 24px" }}>
+        <div style={{ overflowX: "auto", padding: "0 24px" }}>
           {filtered.length === 0 ? (
             <div style={{ textAlign: "center", padding: "40px", color: "#7783a8" }}>
               <div style={{ fontSize: "32px", marginBottom: "8px" }}>📭</div>
               <div>Belum ada riwayat invoice</div>
             </div>
           ) : (
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
+            <table style={{ width: "100%", minWidth: "600px", borderCollapse: "collapse", fontSize: "13px" }}>
               <thead style={{ position: "sticky", top: 0, background: "#fff" }}>
                 <tr style={{ borderBottom: "2px solid #051d76" }}>
                   <th style={{ textAlign: "left", padding: "10px 8px", fontSize: "10px", textTransform: "uppercase", color: "#7783a8" }}>Invoice</th>
@@ -217,7 +259,8 @@ export default function InvoiceHistory({ onLoadInvoice, onClose }: Props) {
                           Buka
                         </button>
                         <button
-                          onClick={(e) => { e.stopPropagation(); handleDelete(h.id); }}
+                          disabled={busy || Boolean(error)}
+                          onClick={(e) => { e.stopPropagation(); void handleDelete([h]); }}
                           style={{ background: "#fff0f0", color: "#c0392b", border: "1px solid #f5c6cb", borderRadius: "6px", padding: "6px 10px", fontSize: "11px", fontWeight: 600, cursor: "pointer" }}
                         >
                           🗑️
@@ -233,7 +276,7 @@ export default function InvoiceHistory({ onLoadInvoice, onClose }: Props) {
                               <div style={{ fontSize: "11px", fontWeight: 700, color: "#7783a8", textTransform: "uppercase", marginBottom: "4px" }}>Riwayat Cicilan:</div>
                               {h.data.riwayatPembayaran.map((p, i) => (
                                 <div key={i} style={{ fontSize: "12px", color: "#4a5568", padding: "2px 0" }}>
-                                  {i + 1}. {String(p.tanggal)} — {p.bank} — {rupiah(p.jumlah)}
+                                  {i + 1}. {String(p.tanggal)} — {labelPembayaran(p)} — {rupiah(p.jumlah)}
                                 </div>
                               ))}
                             </div>
@@ -248,22 +291,20 @@ export default function InvoiceHistory({ onLoadInvoice, onClose }: Props) {
           )}
         </div>
 
+        </div>
+
         {/* Footer */}
-        <div style={{ padding: "12px 24px", borderTop: "1px solid #e3e7f3", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div style={{ flexShrink: 0, flexWrap: "wrap", gap: "8px", padding: "12px 24px", borderTop: "1px solid #e3e7f3", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div style={{ fontSize: "12px", color: "#7783a8" }}>
             Menampilkan {filtered.length} dari {history.length} invoice
           </div>
           {history.length > 0 && (
             <button
-              onClick={() => {
-                if (confirm("Yakin hapus SEMUA riwayat?")) {
-                  clearHistory();
-                  setHistory([]);
-                }
-              }}
+              disabled={busy || Boolean(error)}
+              onClick={()=>handleDelete(history)}
               style={{ background: "none", border: "none", color: "#c0392b", fontSize: "12px", cursor: "pointer", textDecoration: "underline" }}
             >
-              Hapus Semua Riwayat
+              Hapus Semua Riwayat (nomor tetap disimpan)
             </button>
           )}
         </div>

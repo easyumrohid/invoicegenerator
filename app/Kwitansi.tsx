@@ -1,6 +1,9 @@
 "use client";
+import { labelPembayaran } from "./utils";
 
-import React, { forwardRef, useMemo } from "react";
+import { hitungDibayar, tanggalHariIni } from "./utils";
+
+import React, { forwardRef } from "react";
 import "./kwitansi.css";
 import { COMPANY } from "./constants";
 import { InvoiceData } from "./types";
@@ -9,8 +12,6 @@ import {
   formatDicetak,
   rupiah,
   terbilang,
-  hitungSubtotal,
-  hitungTotal,
   generateKwitansiNumber,
 } from "./utils";
 
@@ -19,16 +20,7 @@ type Props = {
 };
 
 const Kwitansi = forwardRef<HTMLDivElement, Props>(({ data }, ref) => {
-  const subtotal = useMemo(() => hitungSubtotal(data.items), [data.items]);
-
-  const total = useMemo(
-    () => hitungTotal(subtotal, data.diskon ?? 0, data.pajak ?? 0, data.biayaAdmin ?? 0),
-    [subtotal, data.diskon, data.pajak, data.biayaAdmin]
-  );
-
-  const dibayar = data.riwayatPembayaran
-    ? data.riwayatPembayaran.reduce((acc, curr) => acc + (Number(curr.jumlah) || 0), 0)
-    : (Number(data.jumlahDibayar) || 0);
+  const dibayar = hitungDibayar(data);
 
   const nomorKwitansi = generateKwitansiNumber(data.nomorInvoice);
 
@@ -127,7 +119,7 @@ const Kwitansi = forwardRef<HTMLDivElement, Props>(({ data }, ref) => {
               <thead>
                 <tr>
                   <th>Tanggal</th>
-                  <th>Bank</th>
+                  <th>Metode Pembayaran</th>
                   <th>Jumlah</th>
                 </tr>
               </thead>
@@ -135,7 +127,7 @@ const Kwitansi = forwardRef<HTMLDivElement, Props>(({ data }, ref) => {
                 {data.riwayatPembayaran.map((bayar, index) => (
                   <tr key={index}>
                     <td>{formatTanggal(bayar.tanggal as string)}</td>
-                    <td>{bayar.bank || "Bank"}</td>
+                    <td>{labelPembayaran(bayar)}</td>
                     <td>{rupiah(bayar.jumlah)}</td>
                   </tr>
                 ))}

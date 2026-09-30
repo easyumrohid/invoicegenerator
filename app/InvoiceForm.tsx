@@ -1,13 +1,18 @@
 "use client";
+import { hitungBiaya, labelPembayaran, pembayaranUntukCicilan } from "./utils";
+
+import { hitungDibayar, tanggalHariIni } from "./utils";
 
 import React, { useState } from "react";
 import "@/app/invoice-form.css";
 import { exportPDF, exportKwitansiPDF } from "./pdf";
 import { BANK_OPTIONS } from "./constants";
-import { generateInvoiceNumber, generateKwitansiNumber, resetInvoiceNumber } from "./utils";
-import { saveToHistory } from "./storage";
+import { generateKwitansiNumber } from "./utils";
+import { exportJSON } from "./storage";
+import { suggestCloudNumber, saveCloudInvoice, importCloudInvoices, databaseError } from "./database";
+import { useRef } from "react";
 import type { InvoiceData } from "./types";
-import { hitungSubtotal, hitungTotal, statusInvoice } from "./utils";
+import { statusInvoice } from "./utils";
 import CSVUpload from "./CSVUpload";
 import InvoiceHistory from "./InvoiceHistory";
 import type { InvoiceHistoryItem } from "./storage";
@@ -25,8 +30,25 @@ export default function InvoiceForm({ data, setData, invoiceRef, kwitansiRef, is
   const [showHistory, setShowHistory] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
 
+  const numberRequest = useRef(0);
+  const dataRef = useRef(data);
+  dataRef.current = data;
+  const [isResetting, setIsResetting] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState("");
+
   // --- HANDLER INPUT DASAR ---
   const handleChange = (field: keyof InvoiceData, value: string | number) => {
+    if (field === "nomorInvoice") numberRequest.current++;
+    if (field === "tanggal" && !data.recordId) {
+      const request = ++numberRequest.current;
+      setData({...data, tanggal: String(value), nomorInvoice: ""});
+      if (!value) return;
+      void suggestCloudNumber(String(value)).then(number => {
+        if (request === numberRequest.current) setData({...dataRef.current, nomorInvoice: number});
+      }).catch(e => alert(databaseError(e)));
+      return;
+    }
     setData({ ...data, [field]: value });
   };
 
@@ -36,7 +58,7 @@ export default function InvoiceForm({ data, setData, invoiceRef, kwitansiRef, is
   const onlyDigits = (v: string) => v.replace(/[^\d]/g, "");
   const parseAngka = (v: string) => {
     const digits = onlyDigits(v);
-    return digits === "" ? 0 : Number(digits);
+    return digits === "" ? 0 : Math.min(Number(digits), 1_000_000_000_000);
   };
 
   // --- HANDLER ITEMS ---
@@ -56,6 +78,7 @@ export default function InvoiceForm({ data, setData, invoiceRef, kwitansiRef, is
     const item = { ...newItems[index], [field]: value };
     if (field === "qty" || field === "hargaSatuan") {
       item.jumlah = (Number(item.qty) || 0) * (Number(item.hargaSatuan) || 0);
+      if (item.jumlah > 1e12) { alert("Jumlah item maksimal Rp1 triliun."); return; }
     }
     newItems[index] = item;
     setData({ ...data, items: newItems });
@@ -70,17 +93,19 @@ export default function InvoiceForm({ data, setData, invoiceRef, kwitansiRef, is
   // --- HANDLER RIWAYAT PEMBAYARAN (CICILAN) ---
   const tambahPembayaran = () => {
     const newItem = {
-      tanggal: new Date().toISOString().slice(0, 10),
+      tanggal: tanggalHariIni(),
       metode: "Transfer Bank",
       bank: "Mandiri",
       jumlah: 0,
     };
-    setData({ ...data, riwayatPembayaran: [...(data.riwayatPembayaran || []), newItem] });
+    setData({ ...data, jumlahDibayar: 0, riwayatPembayaran: [...pembayaranUntukCicilan(data), newItem] });
   };
 
   const updatePembayaran = (index: number, field: string, value: string | number) => {
     const newRiwayat = [...(data.riwayatPembayaran || [])];
-    newRiwayat[index] = { ...newRiwayat[index], [field]: value };
+    if (field === "jenisPembayaran") {
+      newRiwayat[index] = {...newRiwayat[index], metode: value === "Cash" ? "Cash" : "Transfer Bank", bank: value === "Cash" ? undefined : String(value)};
+    } else newRiwayat[index] = { ...newRiwayat[index], [field]: value };
     setData({ ...data, riwayatPembayaran: newRiwayat });
   };
 
@@ -90,56 +115,58 @@ export default function InvoiceForm({ data, setData, invoiceRef, kwitansiRef, is
     setData({ ...data, riwayatPembayaran: newRiwayat });
   };
 
-  // --- HANDLER CETAK ---
-  const handlePrint = () => {
-    setData({ ...data, dicetakPada: new Date().toISOString() });
-    setTimeout(() => window.print(), 100);
-  };
-
-  // --- HANDLER DOWNLOAD PDF ---
-  const handleDownloadPDF = async () => {
-    if (!invoiceRef.current || isDownloading) return;
-    setIsDownloading(true);
-
-    try {
-      const updatedData = { ...data, dicetakPada: new Date().toISOString() };
-      setData(updatedData);
-      await new Promise((resolve) => setTimeout(resolve, 200));
-      await exportPDF(invoiceRef, `${updatedData.nomorInvoice || "invoice"}.pdf`);
-
-      if (isLunas && kwitansiRef?.current) {
-        await new Promise((resolve) => setTimeout(resolve, 500));
-        await exportKwitansiPDF(
-          kwitansiRef,
-          `${generateKwitansiNumber(updatedData.nomorInvoice) || "kwitansi"}.pdf`
-        );
-      }
-
-      // Save to history after successful download
-      const subtotal = updatedData.items.reduce((t, i) => t + i.jumlah, 0);
-      const total = hitungTotal(subtotal, updatedData.diskon ?? 0, updatedData.pajak ?? 0, updatedData.biayaAdmin ?? 0);
-      const dibayar = updatedData.riwayatPembayaran
-        ? updatedData.riwayatPembayaran.reduce((acc, curr) => acc + (Number(curr.jumlah) || 0), 0)
-        : (Number(updatedData.jumlahDibayar) || 0);
-      const status = statusInvoice(total, dibayar);
-      saveToHistory(updatedData, total, dibayar, status);
-    } catch (err) {
-      console.error("Download error:", err);
-      alert("Gagal membuat PDF. Coba lagi.");
-    } finally {
-      setIsDownloading(false);
+  const persistInvoice = async () => {
+    if (!data.nomorInvoice.trim() || !data.tanggal || !data.namaCustomer.trim() || data.items.length === 0 || data.items.some(item => !item.deskripsi.trim())) {
+      throw new Error("Isi nomor invoice, tanggal, nama customer, dan minimal satu item dengan deskripsi.");
     }
+    const saved = await saveCloudInvoice({...data, dicetakPada: new Date().toISOString()});
+    setData(saved);
+    return saved;
+  };
+  const handleSave = async () => {
+    if (isSaving || isDownloading) return;
+    setIsSaving(true); setSaveMessage("");
+    try { await persistInvoice(); setSaveMessage("INV berhasil tersimpan di database."); }
+    catch(e) {alert(e instanceof Error ? e.message : databaseError(e));}
+    finally {setIsSaving(false);}
+  };
+  // Data disimpan lebih dulu agar PDF tidak beredar dengan nomor yang bertabrakan.
+  const handleDownloadPDF = async () => {
+    if (!invoiceRef.current || isDownloading || isSaving) return;
+    setIsDownloading(true); setSaveMessage("");
+    let stored = false;
+    try {
+      const saved = await persistInvoice(); stored = true;
+      await new Promise(resolve => setTimeout(resolve, 200));
+      await exportPDF(invoiceRef, `${saved.nomorInvoice}.pdf`);
+      if (isLunas && kwitansiRef?.current) await exportKwitansiPDF(kwitansiRef, `${generateKwitansiNumber(saved.nomorInvoice)}.pdf`);
+      setSaveMessage("INV tersimpan di database. PDF diunduh ke komputer.");
+    } catch(e) {
+      alert((stored ? "INV sudah tersimpan, tetapi unduhan PDF gagal. Coba unduh ulang. " : "INV belum tersimpan. ") + (e instanceof Error ? e.message : databaseError(e)));
+    } finally {setIsDownloading(false);}
   };
 
   // --- HANDLER CLEAR ALL ---
-  const handleClearAll = () => {
-    if (confirm("Yakin ingin mengosongkan semua data?")) {
-      const tgl = new Date().toISOString().slice(0, 10);
+  const handleClearAll = async () => {
+    if (confirm("Kosongkan form untuk membuat INV baru? Riwayat dan catatan nomor tetap disimpan.")) {
+      const tgl = tanggalHariIni();
+      let nextNumber = "";
+      numberRequest.current++;
+      setIsResetting(true);
+      try { nextNumber = await suggestCloudNumber(tgl); } catch(e) { alert(databaseError(e)); return; }
+      finally {setIsResetting(false);}
+      setSaveMessage("");
       setData({
-        ...data,
-        nomorInvoice: resetInvoiceNumber(tgl),
+        ...dataRef.current,
+        recordId: undefined,
+        recordVersion: undefined,
+        nomorInvoice: nextNumber,
         tanggal: tgl,
         namaCustomer: "",
+        referensi: "",
+        dicetakPada: "",
+        jumlahDibayar: 0,
+        tanggalBayar: "",
         items: [{
           id: crypto.randomUUID(),
           deskripsi: "",
@@ -152,14 +179,18 @@ export default function InvoiceForm({ data, setData, invoiceRef, kwitansiRef, is
         diskon: 0,
         pajak: 0,
         biayaAdmin: 0,
+        diskonMode: "nominal",
+        pajakMode: "nominal",
+        biayaAdminMode: "nominal",
       });
     }
   };
 
   // --- HANDLER CSV IMPORT ---
-  const handleCSVImport = (invoices: InvoiceData[]) => {
+  const handleCSVImport = async (invoices: InvoiceData[]) => {
     if (invoices.length > 0) {
-      setData(invoices[0]);
+      const saved = await importCloudInvoices(invoices);
+      setData(saved[0].data);
       if (invoices.length > 1) {
         alert(`Berhasil import ${invoices.length} invoice. Menampilkan invoice pertama.`);
       }
@@ -168,13 +199,18 @@ export default function InvoiceForm({ data, setData, invoiceRef, kwitansiRef, is
 
   // --- HANDLER LOAD FROM HISTORY ---
   const handleLoadFromHistory = (historyItem: InvoiceHistoryItem) => {
+    numberRequest.current++;
+    setSaveMessage("");
     setData(historyItem.data);
     setShowHistory(false);
   };
 
   return (
-    <div className="form-panel no-print">
+    <fieldset className="form-panel no-print" disabled={isSaving || isDownloading || isResetting} style={{border:0, margin:0, minWidth:0}}>
       <h1>Pengaturan Invoice</h1>
+      <button type="button" disabled={isSaving || isDownloading} onClick={handleSave}>{isSaving ? "Menyimpan…" : "Simpan INV"}</button>
+      {saveMessage && <p role="status">{saveMessage}</p>}
+      <button type="button" onClick={() => exportJSON(data)}>Unduh Cadangan JSON</button>
       <p className="hint">Silakan ubah detail form di bawah, preview akan terupdate otomatis.</p>
 
       {/* ── AKSI CEPAT ───────────────────────────── */}
@@ -206,34 +242,15 @@ export default function InvoiceForm({ data, setData, invoiceRef, kwitansiRef, is
           Nomor Invoice
           <input
             type="text"
+            readOnly={Boolean(data.recordId)}
             value={data.nomorInvoice}
             onChange={(e) => handleChange("nomorInvoice", e.target.value)}
           />
         </label>
-        <button
-          type="button"
-          onClick={() => {
-            const newNum = generateInvoiceNumber(data.tanggal);
-            handleChange("nomorInvoice", newNum);
-          }}
-          title="Generate nomor invoice baru berdasarkan tanggal"
-          style={{
-            padding: "10px 12px",
-            background: "#f0f4ff",
-            color: "#0d5bd7",
-            border: "1px solid #c7d5f9",
-            borderRadius: "8px",
-            fontSize: "12px",
-            fontWeight: 600,
-            cursor: "pointer",
-            marginBottom: "14px",
-            whiteSpace: "nowrap",
-          }}
-        >
-          🔄 Generate
-        </button>
+
       </div>
 
+      <p className="hint">Nomor baru mengikuti daftar nomor yang belum pernah digunakan. Catatan nomor tetap ada setelah riwayat dihapus.</p>
       <div className="item-row-grid">
         <label>
           Tanggal
@@ -289,10 +306,16 @@ export default function InvoiceForm({ data, setData, invoiceRef, kwitansiRef, is
             <label>
               Qty
               <input
-                type="text"
-                inputMode="numeric"
-                value={item.qty || ""}
-                onChange={(e) => updateItem(index, "qty", parseAngka(e.target.value))}
+                type="number"
+                min="0"
+                max="1000000000000"
+                step="any"
+                inputMode="decimal"
+                value={item.qty ?? ""}
+                onChange={(e) => {
+                  const value = e.target.value.replace(",", ".");
+                  if (/^\d*(?:\.\d*)?$/.test(value) && Number(value) <= 1e12) updateItem(index, "qty", Number(value));
+                }}
               />
             </label>
             <label>
@@ -331,12 +354,13 @@ export default function InvoiceForm({ data, setData, invoiceRef, kwitansiRef, is
             </label>
 
             <label>
-              Bank Tujuan
+              Metode Pembayaran
               <select
-                value={bayar.bank || "Mandiri"}
-                onChange={(e) => updatePembayaran(index, "bank", e.target.value)}
+                value={labelPembayaran(bayar)}
+                onChange={(e) => updatePembayaran(index, "jenisPembayaran", e.target.value)}
               >
-                {BANK_OPTIONS.map((bank) => (
+                {!["Mandiri", "BNI", "Cash"].includes(labelPembayaran(bayar)) && <option value={labelPembayaran(bayar)}>{labelPembayaran(bayar)}</option>}
+                {[...BANK_OPTIONS, "Cash"].map((bank) => (
                   <option key={bank} value={bank}>{bank}</option>
                 ))}
               </select>
@@ -366,43 +390,37 @@ export default function InvoiceForm({ data, setData, invoiceRef, kwitansiRef, is
       {/* ── PENGATURAN BIAYA ──────────────────────── */}
       <div className="section-title">Pengaturan Biaya</div>
       <div className="item-row-grid">
-        <label>
-          Diskon (Rp)
-          <input
-            type="text"
-            inputMode="numeric"
-            value={data.diskon || ""}
-            onChange={(e) => handleChange("diskon", parseAngka(e.target.value))}
-          />
-        </label>
-        <label>
-          Pajak (Rp)
-          <input
-            type="text"
-            inputMode="numeric"
-            value={data.pajak || ""}
-            onChange={(e) => handleChange("pajak", parseAngka(e.target.value))}
-          />
-        </label>
-        <label>
-          Biaya Admin (Rp)
-          <input
-            type="text"
-            inputMode="numeric"
-            value={data.biayaAdmin || ""}
-            onChange={(e) => handleChange("biayaAdmin", parseAngka(e.target.value))}
-          />
-        </label>
+        {([
+          ["diskon", "diskonMode", "Diskon"],
+          ["pajak", "pajakMode", "Tax"],
+          ["biayaAdmin", "biayaAdminMode", "Service Fee"],
+        ] as const).map(([field, modeField, label]) => (
+          <div key={field}>
+            <label>
+              {label} — Jenis Input
+              <select value={data[modeField] ?? "nominal"} onChange={(e) => setData({...data, [modeField]: e.target.value as "nominal" | "percent", [field]: 0})}>
+                <option value="nominal">Nominal (Rp)</option>
+                <option value="percent">Persentase (%)</option>
+              </select>
+            </label>
+            <label>
+              {label} ({data[modeField] === "percent" ? "%" : "Rp"})
+              <input type="number" min="0" max={data[modeField] === "percent" ? 100 : 1e12} step={data[modeField] === "percent" ? "0.01" : "1"}
+                value={data[field] ?? 0} onChange={(e) => {
+                  const value = Number(e.target.value);
+                  if (Number.isFinite(value) && value >= 0 && value <= (data[modeField] === "percent" ? 100 : 1e12)) handleChange(field, value);
+                }} />
+            </label>
+          </div>
+        ))}
       </div>
+      <p className="hint">Diskon % dihitung dari subtotal. Tax % dan Service Fee % dihitung dari subtotal setelah diskon. Nominal dibulatkan ke rupiah terdekat. Mengganti jenis input mengosongkan nilainya.</p>
 
       <hr style={{ margin: '24px 0', border: 'none', borderTop: '1px solid #e3e7f3' }} />
 
       {/* ── AKSI UTAMA ────────────────────────────── */}
       <div className="action-bar">
         <div className="btn-group">
-          <button type="button" className="print-btn" onClick={handlePrint}>
-            🖨️ Cetak Invoice
-          </button>
           <button
             type="button"
             className="download-btn"
@@ -419,13 +437,13 @@ export default function InvoiceForm({ data, setData, invoiceRef, kwitansiRef, is
           </button>
         </div>
         <button type="button" className="clear-btn" onClick={handleClearAll} title="Kosongkan semua item dan pembayaran">
-          🗑️ Kosongkan Semua
+          Buat INV Baru
         </button>
       </div>
 
       {/* ── MODALS ────────────────────────────────── */}
       {showCSV && <CSVUpload onImport={handleCSVImport} onClose={() => setShowCSV(false)} />}
       {showHistory && <InvoiceHistory onLoadInvoice={handleLoadFromHistory} onClose={() => setShowHistory(false)} />}
-    </div>
+    </fieldset>
   );
 }

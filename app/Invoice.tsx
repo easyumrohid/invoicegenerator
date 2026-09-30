@@ -1,6 +1,9 @@
 "use client";
+import { hitungBiaya, labelPembayaran } from "./utils";
 
-import React, { forwardRef, useMemo } from "react";
+import { hitungDibayar, tanggalHariIni } from "./utils";
+
+import React, { forwardRef } from "react";
 import "./invoice.css";
 import { COMPANY } from "./constants";
 import { InvoiceData } from "./types";
@@ -9,8 +12,6 @@ import {
   formatDicetak,
   rupiah,
   rekening,
-  hitungSubtotal,
-  hitungTotal,
   statusInvoice,
   terbilang,
 } from "./utils";
@@ -20,23 +21,10 @@ type Props = {
 };
 
 const Invoice = forwardRef<HTMLDivElement, Props>(({ data }, ref) => {
-  const subtotal = useMemo(() => {
-    return hitungSubtotal(data.items);
-  }, [data.items]);
-
-  const total = useMemo(() => {
-    return hitungTotal(
-      subtotal,
-      data.diskon ?? 0,
-      data.pajak ?? 0,
-      data.biayaAdmin ?? 0
-    );
-  }, [subtotal, data.diskon, data.pajak, data.biayaAdmin]);
+  const {subtotal, diskon, tax, serviceFee, total} = hitungBiaya(data);
 
   // Hitung total dibayar dari riwayat cicilan (jika ada)
-  const dibayar = data.riwayatPembayaran 
-    ? data.riwayatPembayaran.reduce((acc, curr) => acc + (Number(curr.jumlah) || 0), 0)
-    : (Number(data.jumlahDibayar) || 0);
+  const dibayar = hitungDibayar(data);
 
   const sisa = Math.max(total - dibayar, 0);
   const status = statusInvoice(total, dibayar);
@@ -60,14 +48,6 @@ const Invoice = forwardRef<HTMLDivElement, Props>(({ data }, ref) => {
       <div className="sheet">
         {/* HEADER */}
         <header className="head">
-          <svg className="crescent" viewBox="0 0 100 100" fill="none">
-            <path
-              d="M62 15C48 20 40 34 40 50C40 66 48 80 62 85C45 88 28 76 24 58C20 38 32 20 51 15C55 14 58.5 14 62 15Z"
-              stroke="#ffffff"
-              strokeWidth={1.4}
-            />
-          </svg>
-
           <div className="head-row">
             <img 
               src="/logo_header.png" 
@@ -162,22 +142,22 @@ const Invoice = forwardRef<HTMLDivElement, Props>(({ data }, ref) => {
 
             {(data.diskon ?? 0) > 0 && (
               <div className="totals-row">
-                <span>Diskon</span>
-                <span>- {rupiah(data.diskon!)}</span>
+                <span>Diskon{data.diskonMode === "percent" ? ` (${data.diskon}%)` : ""}</span>
+                <span>- {rupiah(diskon)}</span>
               </div>
             )}
 
             {(data.pajak ?? 0) > 0 && (
               <div className="totals-row">
-                <span>Pajak</span>
-                <span>{rupiah(data.pajak!)}</span>
+                <span>Tax{data.pajakMode === "percent" ? ` (${data.pajak}%)` : ""}</span>
+                <span>{rupiah(tax)}</span>
               </div>
             )}
 
             {(data.biayaAdmin ?? 0) > 0 && (
               <div className="totals-row">
-                <span>Biaya Admin</span>
-                <span>{rupiah(data.biayaAdmin!)}</span>
+                <span>Service Fee{data.biayaAdminMode === "percent" ? ` (${data.biayaAdmin}%)` : ""}</span>
+                <span>{rupiah(serviceFee)}</span>
               </div>
             )}
 
@@ -199,7 +179,7 @@ const Invoice = forwardRef<HTMLDivElement, Props>(({ data }, ref) => {
                     key={index} 
                     className="totals-row payment-history-item"
                   >
-                    <span>↳ {formatTanggal(bayar.tanggal as string)} — {bayar.bank || "Bank"}</span>
+                    <span>↳ {formatTanggal(bayar.tanggal as string)} — {labelPembayaran(bayar)}</span>
                     <span>{rupiah(bayar.jumlah)}</span>
                   </div>
                 ))}
@@ -235,7 +215,7 @@ const Invoice = forwardRef<HTMLDivElement, Props>(({ data }, ref) => {
           <div className="note-left">
             <div className="note-title">Catatan</div>
             <p>
-              Mohon melakukan pembayaran sesuai nominal invoice. Simpan bukti transfer dan kirimkan kepada admin EasyUmroh untuk proses verifikasi pembayaran.
+              DP minimal 30% dari total pesanan; tiket pesawat wajib dibayar lunas; sisa tagihan dilunasi paling lambat 30 hari sebelum keberangkatan. Simpan dan kirim bukti pembayaran ke admin easyUmroh untuk verifikasi.
             </p>
           </div>
           <img 

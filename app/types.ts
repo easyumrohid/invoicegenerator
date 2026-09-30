@@ -1,3 +1,4 @@
+export type FeeMode = "nominal" | "percent";
 export interface InvoiceItem {
   id: string;
   deskripsi: string;
@@ -32,6 +33,8 @@ export interface RiwayatPembayaran {
 }
 
 export interface InvoiceData {
+  recordId?: string; // ID database; tetap sama saat mengedit invoice.
+  recordVersion?: string; // Mencegah perubahan perangkat lain tertimpa.
   nomorInvoice: string;
   tanggal: string;
   referensi?: string;
@@ -51,10 +54,13 @@ export interface InvoiceData {
   jumlahDibayar: number;
 
   diskon?: number;
+  diskonMode?: FeeMode;
 
   pajak?: number;
+  pajakMode?: FeeMode;
 
   biayaAdmin?: number;
+  biayaAdminMode?: FeeMode;
 
   // 2. Tambahkan properti array cicilan (opsional agar tidak error pada data lama)
   riwayatPembayaran?: RiwayatPembayaran[];

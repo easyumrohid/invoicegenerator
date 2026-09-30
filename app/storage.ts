@@ -1,3 +1,6 @@
+import { hitungBiaya } from "./utils";
+import { validateInvoice } from "./validation";
+import { tanggalHariIni, hitungDibayar, statusInvoice } from "./utils";
 import { InvoiceData } from "./types";
 
 const STORAGE_KEY = "easyumroh_invoice";
@@ -5,17 +8,17 @@ const HISTORY_KEY = "easyumroh_invoices_history";
 
 // ── SINGLE INVOICE (current behavior, for draft/editing) ──
 
-export function saveInvoice(data: InvoiceData) {
+export function saveInvoice(data: InvoiceData, userId?: string) {
   if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  localStorage.setItem(userId ? `${STORAGE_KEY}:${userId}` : STORAGE_KEY, JSON.stringify(data));
 }
 
-export function loadInvoice(): InvoiceData | null {
+export function loadInvoice(userId?: string): InvoiceData | null {
   if (typeof window === "undefined") return null;
-  const raw = localStorage.getItem(STORAGE_KEY);
-  if (!raw) return null;
   try {
-    return JSON.parse(raw);
+    const raw = localStorage.getItem(userId ? `${STORAGE_KEY}:${userId}` : STORAGE_KEY);
+    if (!raw) return null;
+    return validateInvoice(JSON.parse(raw));
   } catch {
     return null;
   }
@@ -64,15 +67,40 @@ export function saveToHistory(data: InvoiceData, total: number, dibayar: number,
     history.unshift(item); // add to top
   }
 
-  localStorage.setItem(HISTORY_KEY, JSON.stringify(history.slice(0, 100))); // max 100 records
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(history)); // Preserve all saved invoices; quota errors are shown to the user.
+}
+
+// Commit CSV imports in a single write: quota failures cannot leave a partial batch.
+export function saveImportedInvoices(invoices: InvoiceData[]) {
+  if (typeof window === "undefined") return;
+  const history = loadHistory();
+  for (const input of invoices) {
+    const data = validateInvoice(input);
+    const total = hitungBiaya(data).total;
+    const dibayar = hitungDibayar(data);
+    const index = history.findIndex(h => h.nomorInvoice === data.nomorInvoice);
+    const item: InvoiceHistoryItem = {id:index < 0 ? crypto.randomUUID() : history[index].id, nomorInvoice:data.nomorInvoice, namaCustomer:data.namaCustomer, tanggal:data.tanggal, total, dibayar, status:statusInvoice(total,dibayar), dicetakPada:data.dicetakPada || new Date().toISOString(), data};
+    if (index < 0) history.unshift(item); else history[index] = item;
+  }
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
 }
 
 export function loadHistory(): InvoiceHistoryItem[] {
   if (typeof window === "undefined") return [];
-  const raw = localStorage.getItem(HISTORY_KEY);
-  if (!raw) return [];
   try {
-    return JSON.parse(raw);
+    const raw = localStorage.getItem(HISTORY_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.flatMap((h) => {
+      try {
+        if (!h || typeof h.id !== "string") return [];
+        const data = validateInvoice(h.data);
+        const total = hitungBiaya(data).total;
+        const dibayar = hitungDibayar(data);
+        return [{...h, data, nomorInvoice: data.nomorInvoice, namaCustomer: data.namaCustomer, tanggal: data.tanggal, total, dibayar, status: statusInvoice(total, dibayar)}];
+      } catch { return []; }
+    });
   } catch {
     return [];
   }
@@ -105,68 +133,72 @@ export interface CSVRow {
   itemQty: number;
   itemHargaSatuan: number;
   diskon?: number;
+  diskonMode?: import("./types").FeeMode;
+  pajakMode?: import("./types").FeeMode;
+  biayaAdminMode?: import("./types").FeeMode;
   pajak?: number;
   biayaAdmin?: number;
   bank?: string;
   nomorRekening?: string;
   atasNama?: string;
+  jumlahDibayar?: number;
+  metodePembayaran?: string;
+  tanggalBayar?: string;
+  riwayatJSON?: string;
+  rekeningJSON?: string;
 }
 
-export function parseCSV(text: string): CSVRow[] {
-  const lines = text.trim().split("\n").filter((l) => l.trim());
-  if (lines.length < 2) return [];
-
-  const headers = lines[0].split(",").map((h) => h.trim().toLowerCase().replace(/"/g, ""));
-  const rows: CSVRow[] = [];
-
-  for (let i = 1; i < lines.length; i++) {
-    const values = parseCSVLine(lines[i]);
-    if (values.length < 6) continue;
-
-    const get = (name: string) => {
-      const idx = headers.indexOf(name.toLowerCase());
-      return idx >= 0 ? values[idx]?.trim() || "" : "";
-    };
-
-    rows.push({
-      nomorInvoice: get("nomor_invoice") || get("no_invoice") || get("invoice"),
-      tanggal: get("tanggal") || get("date"),
-      namaCustomer: get("nama_customer") || get("customer") || get("nama"),
-      referensi: get("referensi") || get("ref"),
-      itemDeskripsi: get("item_deskripsi") || get("deskripsi") || get("item"),
-      itemSubDeskripsi: get("item_sub_deskripsi") || get("sub_deskripsi"),
-      itemQty: parseFloat(get("item_qty") || get("qty")) || 1,
-      itemHargaSatuan: parseFloat(get("item_harga_satuan") || get("harga") || get("harga_satuan")) || 0,
-      diskon: parseFloat(get("diskon")) || 0,
-      pajak: parseFloat(get("pajak")) || 0,
-      biayaAdmin: parseFloat(get("biaya_admin") || get("admin")) || 0,
-      bank: get("bank") || "Mandiri",
-      nomorRekening: get("nomor_rekening") || get("rekening"),
-      atasNama: get("atas_nama") || get("an"),
-    });
+function csvRecords(text: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [], cell = "", quoted = false;
+  text = text.replace(/^\uFEFF/, "");
+  for (let i=0; i<text.length; i++) {
+    const c = text[i];
+    if (c === '"') {
+      if (quoted && text[i+1] === '"') { cell += '"'; i++; }
+      else if (quoted || cell === "") quoted = !quoted;
+      else throw new Error("Tanda kutip CSV tidak valid");
+    } else if (c === ',' && !quoted) { row.push(cell); cell = ""; }
+    else if ((c === '\n' || c === '\r') && !quoted) {
+      row.push(cell); if (row.some(v=>v.trim())) rows.push(row);
+      row = []; cell = "";
+      if (c === '\r' && text[i+1] === '\n') i++;
+    } else cell += c;
   }
-
+  if (quoted) throw new Error("Tanda kutip CSV belum ditutup");
+  row.push(cell); if (row.some(v=>v.trim())) rows.push(row);
   return rows;
 }
 
-function parseCSVLine(line: string): string[] {
-  const result: string[] = [];
-  let current = "";
-  let inQuotes = false;
-
-  for (let i = 0; i < line.length; i++) {
-    const char = line[i];
-    if (char === '"') {
-      inQuotes = !inQuotes;
-    } else if (char === ',' && !inQuotes) {
-      result.push(current.trim());
-      current = "";
-    } else {
-      current += char;
-    }
-  }
-  result.push(current.trim());
-  return result;
+export function parseCSV(text: string): CSVRow[] {
+  const records = csvRecords(text);
+  if (records.length < 2) return [];
+  const headers = records[0].map(h=>h.trim().toLowerCase().replace(/\s+/g, "_"));
+  if (new Set(headers).size !== headers.length) throw new Error("Kolom CSV duplikat");
+  const aliases: Record<string, string[]> = {
+    nomor_invoice: ["nomor_invoice","no_invoice","invoice"], tanggal: ["tanggal","date"], nama_customer:["nama_customer","customer","nama"],
+    item_deskripsi:["item_deskripsi","deskripsi","item"], item_qty:["item_qty","qty"], item_harga_satuan:["item_harga_satuan","harga","harga_satuan"]
+  };
+  for (const options of Object.values(aliases)) if (!options.some(h=>headers.includes(h))) throw new Error(`Kolom wajib tidak ada: ${options[0]}`);
+  return records.slice(1).map((values, idx) => {
+    if (values.length !== headers.length) throw new Error(`Baris ${idx+2}: jumlah kolom tidak sesuai`);
+    const get = (...names: string[]) => { const i = headers.findIndex(h=>names.includes(h)); return i < 0 ? "" : values[i].trim(); };
+    const num = (name: string, fallback = 0, ...extra: string[]) => {
+      const raw = get(...(aliases[name] ?? [name]), ...extra);
+      if (!raw) return fallback;
+      if (!/^\d+(?:\.\d+)?$/.test(raw)) throw new Error(`Baris ${idx+2}: ${name} harus angka tanpa pemisah ribuan`);
+      const value = Number(raw);
+      if (!Number.isFinite(value) || value > 1e12) throw new Error(`Baris ${idx+2}: ${name} terlalu besar`);
+      return value;
+    };
+    const nomorInvoice = get(...aliases.nomor_invoice), tanggal = get(...aliases.tanggal), namaCustomer = get(...aliases.nama_customer), itemDeskripsi = get(...aliases.item_deskripsi);
+    if (!nomorInvoice || !namaCustomer || !itemDeskripsi || !/^\d{4}-\d{2}-\d{2}$/.test(tanggal) || !Number.isFinite(Date.parse(tanggal)) || new Date(tanggal).toISOString().slice(0,10) !== tanggal) throw new Error(`Baris ${idx+2}: identitas atau tanggal tidak valid`);
+    return { nomorInvoice, tanggal, namaCustomer, itemDeskripsi, referensi:get("referensi","ref"), itemSubDeskripsi:get("item_sub_deskripsi","sub_deskripsi"),
+      itemQty:num("item_qty",1), itemHargaSatuan:num("item_harga_satuan"), diskon:num("diskon"), pajak:num("pajak",0,"tax"), biayaAdmin:num("biaya_admin",0,"admin","service_fee"),
+      diskonMode:(get("diskon_mode") || "nominal") as import("./types").FeeMode, pajakMode:(get("tax_mode", "pajak_mode") || "nominal") as import("./types").FeeMode, biayaAdminMode:(get("service_fee_mode", "biaya_admin_mode") || "nominal") as import("./types").FeeMode,
+      bank:get("bank"), nomorRekening:get("nomor_rekening","rekening"), atasNama:get("atas_nama","an"),
+      jumlahDibayar:num("dibayar"), metodePembayaran:get("metode_pembayaran"), tanggalBayar:get("tanggal_bayar"), riwayatJSON:get("riwayat_pembayaran_json"), rekeningJSON:get("rekening_bank_json") };
+  });
 }
 
 export function csvRowsToInvoiceData(rows: CSVRow[]): InvoiceData[] {
@@ -183,6 +215,11 @@ export function csvRowsToInvoiceData(rows: CSVRow[]): InvoiceData[] {
 
   for (const [nomorInvoice, itemRows] of grouped) {
     const first = itemRows[0];
+    for (const row of itemRows) {
+      for (const field of ["tanggal", "namaCustomer", "referensi", "diskon", "pajak", "biayaAdmin", "diskonMode", "pajakMode", "biayaAdminMode", "jumlahDibayar", "riwayatJSON", "rekeningJSON"] as const) {
+        if (row[field] !== first[field]) throw new Error(`Data invoice ${nomorInvoice} tidak konsisten pada kolom ${field}`);
+      }
+    }
     const items = itemRows.map((row) => ({
       id: crypto.randomUUID(),
       deskripsi: row.itemDeskripsi,
@@ -202,58 +239,71 @@ export function csvRowsToInvoiceData(rows: CSVRow[]): InvoiceData[] {
       });
     }
 
-    invoices.push({
+    invoices.push(validateInvoice({
       nomorInvoice,
-      tanggal: first.tanggal || new Date().toISOString().slice(0, 10),
+      tanggal: first.tanggal || tanggalHariIni(),
       referensi: first.referensi,
       namaCustomer: first.namaCustomer || "Customer",
       dicetakPada: "",
       items,
-      rekeningBank: banks.length > 0 ? banks : [],
-      metodePembayaran: "Transfer Bank",
-      tanggalBayar: "",
-      jumlahDibayar: 0,
+      rekeningBank: first.rekeningJSON ? JSON.parse(first.rekeningJSON) : banks,
+      metodePembayaran: first.metodePembayaran || "Transfer Bank",
+      tanggalBayar: first.tanggalBayar || "",
+      jumlahDibayar: first.jumlahDibayar ?? 0,
       diskon: first.diskon || 0,
+      diskonMode: first.diskonMode,
+      pajakMode: first.pajakMode,
+      biayaAdminMode: first.biayaAdminMode,
       pajak: first.pajak || 0,
       biayaAdmin: first.biayaAdmin || 0,
-      riwayatPembayaran: [],
-    });
+      riwayatPembayaran: first.riwayatJSON ? JSON.parse(first.riwayatJSON) : undefined,
+    }));
   }
 
   return invoices;
 }
 
+export const CSV_HEADERS = ["nomor_invoice","tanggal","nama_customer","referensi","item_deskripsi","item_sub_deskripsi","item_qty","item_harga_satuan","diskon","tax","service_fee","dibayar","metode_pembayaran","tanggal_bayar","riwayat_pembayaran_json","rekening_bank_json","diskon_mode","tax_mode","service_fee_mode","total","status"] as const;
+
 export function exportCSV(invoices: InvoiceHistoryItem[]): string {
-  const headers = [
-    "Nomor Invoice", "Tanggal", "Nama Customer", "Referensi",
-    "Item Deskripsi", "Item Sub Deskripsi", "Item Qty", "Item Harga Satuan",
-    "Diskon", "Pajak", "Biaya Admin", "Total", "Dibayar", "Status"
-  ];
-
-  const rows: string[] = [headers.join(",")];
-
-  for (const inv of invoices) {
-    for (const item of inv.data.items) {
-      rows.push([
-        `"${inv.nomorInvoice}"`,
-        `"${inv.tanggal}"`,
-        `"${inv.namaCustomer}"`,
-        `"${inv.data.referensi || ""}"`,
-        `"${item.deskripsi}"`,
-        `"${item.subDeskripsi || ""}"`,
-        item.qty,
-        item.hargaSatuan,
-        inv.data.diskon || 0,
-        inv.data.pajak || 0,
-        inv.data.biayaAdmin || 0,
-        inv.total,
-        inv.dibayar,
-        `"${inv.status}"`,
-      ].join(","));
-    }
+  const headers = CSV_HEADERS;
+  const escape = (value: unknown) => '"' + String(value ?? "").replace(/"/g, '""') + '"';
+  const rows = [headers.join(",")];
+  for (const inv of invoices) for (const item of inv.data.items) {
+    const d = inv.data;
+    rows.push([d.nomorInvoice,d.tanggal,d.namaCustomer,d.referensi,item.deskripsi,item.subDeskripsi,item.qty !== undefined && item.hargaSatuan !== undefined ? item.qty : 1,item.qty !== undefined && item.hargaSatuan !== undefined ? item.hargaSatuan : item.jumlah,d.diskon ?? 0,d.pajak ?? 0,d.biayaAdmin ?? 0,hitungDibayar(d),d.metodePembayaran,d.tanggalBayar,d.riwayatPembayaran === undefined ? "" : JSON.stringify(d.riwayatPembayaran),JSON.stringify(d.rekeningBank),d.diskonMode ?? "nominal",d.pajakMode ?? "nominal",d.biayaAdminMode ?? "nominal",hitungBiaya(d).total,statusInvoice(hitungBiaya(d).total,hitungDibayar(d))].map(escape).join(","));
   }
+  return "\uFEFF" + rows.join("\r\n");
+}
 
-  return rows.join("\n");
+// The downloadable template uses the same serializer and columns as history exports.
+export function createCSVTemplate(): string {
+  const example: InvoiceData = {
+    nomorInvoice: "INV-30092026-0001", tanggal: "2026-09-30", namaCustomer: "Customer Contoh", referensi: "REF-CONTOH-001",
+    items: [
+      {id: "item-1", deskripsi: "Paket Umroh 9 Hari", subDeskripsi: "Hotel Bintang 4", qty: 1, hargaSatuan: 15000000, jumlah: 15000000},
+      {id: "item-2", deskripsi: "City Tour Al-Ula", subDeskripsi: "Tiket Masuk", qty: 2, hargaSatuan: 690000, jumlah: 1380000},
+    ],
+    rekeningBank: [
+      {id:"bank-mandiri", bank:"Mandiri", nomorRekening:"ISI_NOMOR_REKENING_MANDIRI", atasNama:"ISI_NAMA_PEMILIK_REKENING"},
+      {id:"bank-bni", bank:"BNI", nomorRekening:"ISI_NOMOR_REKENING_BNI", atasNama:"ISI_NAMA_PEMILIK_REKENING"},
+    ],
+    metodePembayaran: "Transfer Bank", tanggalBayar: "2026-09-30", jumlahDibayar: 0,
+    riwayatPembayaran: [
+      {tanggal:"2026-09-30", metode:"Transfer Bank", bank:"Mandiri", jumlah:4500000},
+      {tanggal:"2026-09-30", metode:"Transfer Bank", bank:"BNI", jumlah:500000},
+    ],
+    diskon:10, diskonMode:"percent", pajak:11, pajakMode:"percent", biayaAdmin:100000, biayaAdminMode:"nominal",
+  };
+  const cash: InvoiceData = {...example, nomorInvoice:"INV-30092026-0002", namaCustomer:"Customer Cash Contoh", referensi:"REF-CONTOH-002",
+    items:[{id:"item-cash", deskripsi:"Handling Umroh", qty:1, hargaSatuan:1500000, jumlah:1500000}], rekeningBank:[],
+    diskon:0, diskonMode:"nominal", pajak:0, pajakMode:"nominal", biayaAdmin:0, biayaAdminMode:"nominal",
+    metodePembayaran:"Cash", riwayatPembayaran:[{tanggal:"2026-09-30", metode:"Cash", jumlah:500000}],
+  };
+  return exportCSV([example,cash].map((data,index) => {
+    const total = hitungBiaya(data).total, dibayar = hitungDibayar(data);
+    return {id:`template-${index}`, nomorInvoice:data.nomorInvoice, namaCustomer:data.namaCustomer, tanggal:data.tanggal, total, dibayar, status:statusInvoice(total,dibayar), dicetakPada:"", data};
+  }));
 }
 
 export function downloadCSV(content: string, filename: string) {
@@ -283,11 +333,12 @@ export function importJSON(file: File): Promise<InvoiceData> {
     const reader = new FileReader();
     reader.onload = () => {
       try {
-        resolve(JSON.parse(reader.result as string));
+        resolve(validateInvoice(JSON.parse(reader.result as string)));
       } catch {
-        reject("JSON tidak valid");
+        reject(new Error("JSON atau struktur invoice tidak valid"));
       }
     };
+    reader.onerror = () => reject(new Error("File tidak dapat dibaca"));
     reader.readAsText(file);
   });
 }
