@@ -1,0 +1,5 @@
+Ganti tiga file app/DatabaseAccess.tsx, app/globals.css, dan app/database.css di proyek lokal dengan file dari ZIP ini.
+Pertahankan .env.local dan folder public yang sudah ada.
+Hentikan server dengan Ctrl+C, lalu jalankan npm run dev kembali.
+Tidak perlu menjalankan ulang SQL atau menghapus data browser.
+Perbaikan: tinggi bar login dihitung dalam layout, catatan draft di luar area scroll ikut diperhitungkan, tombol Buat INV Baru di bawah Download dapat dijangkau dengan scroll form.

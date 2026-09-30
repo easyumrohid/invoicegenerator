@@ -1,0 +1,18 @@
+.database-login {min-height:100dvh;display:grid;place-items:center;background:#f0f4ff;padding:24px;color:#051d76;}
+.database-login form,.database-login section {max-width:440px;width:100%;background:white;padding:28px;border-radius:16px;box-shadow:0 8px 35px #051d7615;}
+.database-login label {display:block;margin:16px 0;font-size:14px;}
+.database-login input {display:block;box-sizing:border-box;width:100%;margin-top:6px;padding:12px;border:1px solid #d0d5e4;border-radius:8px;}
+.database-login button,.database-bar button {padding:10px 16px;border:0;border-radius:8px;background:#0d5bd7;color:white;cursor:pointer;}
+.database-login button:disabled,.database-bar button:disabled {opacity:.6;cursor:wait;}
+.database-bar {display:flex;align-items:center;flex-wrap:wrap;gap:12px;padding:12px 24px;background:#051d76;color:white;font-size:13px;}
+.database-bar p {margin:0;width:100%;}
+.database-login [role=alert] {color:#a32727;}
+
+/* Header mengikuti tinggi aslinya, area kerja memakai ruang layar yang tersisa. */
+.database-workspace {display:flex;flex-direction:column;height:100dvh;min-height:0;overflow:hidden;}
+.database-workspace > .database-bar {flex-shrink:0;}
+.database-workspace > .page-shell {flex:1 1 0;min-height:0;height:auto;}
+@media screen and (max-width:900px) {
+  .database-workspace {height:auto;min-height:100dvh;overflow:visible;}
+  .database-workspace > .page-shell {flex:none;}
+}

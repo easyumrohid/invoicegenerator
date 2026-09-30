@@ -15,14 +15,14 @@
   box-sizing: border-box;
 }
 
-.sheet {
+.kwitansi-page .sheet {
   padding: 0;
   position: relative;
   overflow: hidden;
 }
 
 /* ── HEADER ── */
-.head {
+.kwitansi-page .head {
   background: #051d76;
   color: #ffffff;
   padding: 20px 32px 16px;
@@ -33,7 +33,7 @@
   overflow: hidden;
 }
 
-.head-row {
+.kwitansi-page .head-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -42,7 +42,7 @@
   z-index: 1;
 }
 
-.header-logo {
+.kwitansi-page .header-logo {
   height: 36px;
   width: auto;
   max-width: 200px;
@@ -51,7 +51,7 @@
 }
 
 /* ── STATUS BADGE ── */
-.status-badge {
+.kwitansi-page .status-badge {
   padding: 5px 12px;
   border-radius: 20px;
   font-size: 10px;
@@ -62,13 +62,13 @@
   line-height: 1;
 }
 
-.status-badge.paid {
+.kwitansi-page .status-badge.paid {
   background: #e8f8ef;
   color: #0f8a4d;
 }
 
 /* ── KWITANSI TITLE & META ── */
-.kwitansi-title {
+.kwitansi-page .kwitansi-title {
   font-size: 24px;
   font-weight: 800;
   margin: 0 0 10px;
@@ -77,38 +77,38 @@
   z-index: 1;
 }
 
-.invoice-meta {
+.kwitansi-page .invoice-meta {
   display: flex;
   gap: 28px;
   position: relative;
   z-index: 1;
 }
 
-.invoice-meta > div {
+.kwitansi-page .invoice-meta > div {
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
 
-.invoice-meta span {
+.kwitansi-page .invoice-meta span {
   font-size: 10px;
   opacity: 0.7;
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
 
-.invoice-meta b {
+.kwitansi-page .invoice-meta b {
   font-size: 12px;
   font-weight: 600;
 }
 
-.mono {
+.kwitansi-page .mono {
   font-family: 'Plus Jakarta Sans', monospace;
   letter-spacing: 0.02em;
 }
 
 /* ── RECEIVED FROM ── */
-.billed {
+.kwitansi-page .billed {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
@@ -117,7 +117,7 @@
   border-bottom: 1px solid #e3e7f3;
 }
 
-.billed .label {
+.kwitansi-page .billed .label {
   font-size: 10px;
   text-transform: uppercase;
   font-weight: 700;
@@ -126,27 +126,27 @@
   margin-bottom: 4px;
 }
 
-.billed .name {
+.kwitansi-page .billed .name {
   font-size: 14px;
   font-weight: 700;
   color: #051d76;
 }
 
-.billed-right {
+.kwitansi-page .billed-right {
   text-align: right;
 }
 
-.printed-at {
+.kwitansi-page .printed-at {
   font-size: 12px;
   color: #7783a8;
 }
 
 /* ── AMOUNT SECTION ── */
-.amount-section {
+.kwitansi-page .amount-section {
   margin: 10px 32px 10px;
 }
 
-.amount-box {
+.kwitansi-page .amount-box {
   background: #f8f9fc;
   border: 1px solid #e3e7f3;
   border-radius: 10px;
@@ -154,7 +154,7 @@
   text-align: center;
 }
 
-.amount-box .label {
+.kwitansi-page .amount-box .label {
   font-size: 10px;
   text-transform: uppercase;
   font-weight: 700;
@@ -163,7 +163,7 @@
   margin-bottom: 4px;
 }
 
-.amount-value {
+.kwitansi-page .amount-value {
   font-size: 22px;
   font-weight: 800;
   color: #051d76;
@@ -171,7 +171,7 @@
 }
 
 /* ── TERBILANG ── */
-.terbilang-kwitansi {
+.kwitansi-page .terbilang-kwitansi {
   margin: 0 32px 10px;
   padding: 10px 16px;
   background: #fafbfd;
@@ -179,7 +179,7 @@
   border-radius: 10px;
 }
 
-.terbilang-kwitansi .title {
+.kwitansi-page .terbilang-kwitansi .title {
   font-size: 10px;
   text-transform: uppercase;
   font-weight: 700;
@@ -189,7 +189,7 @@
   line-height: 1;
 }
 
-.terbilang-kwitansi .text {
+.kwitansi-page .terbilang-kwitansi .text {
   font-size: 13px;
   font-style: italic;
   line-height: 1.5;
@@ -198,7 +198,7 @@
 }
 
 /* ── COMBINED ROW: FOR PAYMENT + TOTAL RECEIVED ── */
-.combined-row {
+.kwitansi-page .combined-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 12px;
@@ -206,11 +206,11 @@
 }
 
 /* ── FOR PAYMENT ── */
-.for-payment {
+.kwitansi-page .for-payment {
   margin: 0;
 }
 
-.for-payment .label {
+.kwitansi-page .for-payment .label {
   font-size: 10px;
   text-transform: uppercase;
   font-weight: 700;
@@ -219,14 +219,14 @@
   margin-bottom: 4px;
 }
 
-.payment-items {
+.kwitansi-page .payment-items {
   background: #f8f9fc;
   border: 1px solid #e3e7f3;
   border-radius: 10px;
   padding: 8px 12px;
 }
 
-.payment-ref {
+.kwitansi-page .payment-ref {
   font-size: 12px;
   font-weight: 600;
   color: #0d5bd7;
@@ -235,13 +235,13 @@
   border-bottom: 1px dashed #e3e7f3;
 }
 
-.payment-item {
+.kwitansi-page .payment-item {
   font-size: 12px;
   color: #1a1a2e;
   padding: 2px 0;
 }
 
-.payment-sub {
+.kwitansi-page .payment-sub {
   display: block;
   font-size: 11px;
   color: #7783a8;
@@ -249,13 +249,13 @@
 }
 
 /* ── PAID SUMMARY ── */
-.paid-summary-section {
+.kwitansi-page .paid-summary-section {
   margin: 0;
   display: flex;
   flex-direction: column;
 }
 
-.paid-box {
+.kwitansi-page .paid-box {
   background: #e8f8ef;
   border: 1px solid #b8e6c8;
   border-radius: 10px;
@@ -268,7 +268,7 @@
   align-items: center;
 }
 
-.paid-label {
+.kwitansi-page .paid-label {
   font-size: 10px;
   text-transform: uppercase;
   font-weight: 700;
@@ -277,14 +277,14 @@
   margin-bottom: 4px;
 }
 
-.paid-value {
+.kwitansi-page .paid-value {
   font-size: 18px;
   font-weight: 800;
   color: #0f8a4d;
   margin-bottom: 2px;
 }
 
-.paid-status {
+.kwitansi-page .paid-status {
   font-size: 11px;
   font-weight: 700;
   color: #0f8a4d;
@@ -293,11 +293,11 @@
 }
 
 /* ── PAYMENT HISTORY TABLE ── */
-.payment-history-kwitansi {
+.kwitansi-page .payment-history-kwitansi {
   margin: 0 32px 10px;
 }
 
-.payment-history-kwitansi .label {
+.kwitansi-page .payment-history-kwitansi .label {
   font-size: 10px;
   text-transform: uppercase;
   font-weight: 700;
@@ -306,17 +306,17 @@
   margin-bottom: 6px;
 }
 
-.payment-history-kwitansi table {
+.kwitansi-page .payment-history-kwitansi table {
   width: 100%;
   border-collapse: collapse;
   font-size: 12px;
 }
 
-.payment-history-kwitansi thead {
+.kwitansi-page .payment-history-kwitansi thead {
   border-bottom: 2px solid #051d76;
 }
 
-.payment-history-kwitansi th {
+.kwitansi-page .payment-history-kwitansi th {
   text-align: left;
   padding: 6px 6px;
   font-size: 10px;
@@ -326,23 +326,23 @@
   color: #7783a8;
 }
 
-.payment-history-kwitansi th:last-child {
+.kwitansi-page .payment-history-kwitansi th:last-child {
   text-align: right;
 }
 
-.payment-history-kwitansi td {
+.kwitansi-page .payment-history-kwitansi td {
   padding: 6px 6px;
   border-bottom: 1px solid #e3e7f3;
 }
 
-.payment-history-kwitansi td:last-child {
+.kwitansi-page .payment-history-kwitansi td:last-child {
   text-align: right;
   font-weight: 600;
   color: #051d76;
 }
 
 /* ── SIGNATURE SECTION ── */
-.signature-section {
+.kwitansi-page .signature-section {
   display: flex;
   justify-content: space-between;
   margin: 0 32px 10px;
@@ -350,21 +350,21 @@
   border-top: 1px solid #e3e7f3;
 }
 
-.signature-left,
-.signature-right {
+.kwitansi-page .signature-left,
+.kwitansi-page .signature-right {
   text-align: center;
   width: 160px;
 }
 
-.signature-left .label,
-.signature-right .label {
+.kwitansi-page .signature-left .label,
+.kwitansi-page .signature-right .label {
   font-size: 11px;
   font-weight: 600;
   color: #7783a8;
   margin-bottom: 8px;
 }
 
-.sign {
+.kwitansi-page .sign {
   text-align: center;
   padding-bottom: 4px;
   display: flex;
@@ -372,14 +372,14 @@
   align-items: center;
 }
 
-.sign-name {
+.kwitansi-page .sign-name {
   font-size: 12px;
   font-weight: 700;
   color: #051d76;
   margin-bottom: 2px;
 }
 
-.sign-image {
+.kwitansi-page .sign-image {
   width: 100px;
   height: auto;
   max-height: 40px;
@@ -387,21 +387,21 @@
   margin-bottom: 2px;
 }
 
-.sign-line {
+.kwitansi-page .sign-line {
   width: 100px;
   height: 1px;
   background: #c4c9d8;
   margin: 0 auto 4px;
 }
 
-.sign span {
+.kwitansi-page .sign span {
   font-size: 11px;
   color: #7783a8;
   line-height: 1;
 }
 
 /* ── FOOTER ── */
-.footer {
+.kwitansi-page .footer {
   display: flex;
   justify-content: space-between;
   align-items: flex-end;
@@ -410,13 +410,13 @@
   margin-top: 4px;
 }
 
-.footer-contact {
+.kwitansi-page .footer-contact {
   font-size: 11px;
   line-height: 1.7;
   color: #7783a8;
 }
 
-.footer-logo {
+.kwitansi-page .footer-logo {
   width: 200px;
   height: auto;
   object-fit: contain;
@@ -424,7 +424,7 @@
   display: block;
 }
 
-.footer-contact b {
+.kwitansi-page .footer-contact b {
   display: block;
   font-size: 12px;
   color: #051d76;
@@ -432,12 +432,12 @@
   line-height: 1.3;
 }
 
-.footer-contact a {
+.kwitansi-page .footer-contact a {
   color: #051d76;
   text-decoration: none;
 }
 
-.footer-contact a:hover {
+.kwitansi-page .footer-contact a:hover {
   text-decoration: underline;
 }
 
@@ -450,21 +450,21 @@
     box-shadow: none;
   }
 
-  .sheet {
+  .kwitansi-page .sheet {
     padding: 0;
   }
 
-  .head {
+  .kwitansi-page .head {
     padding: 20px 0 16px;
   }
 
-  .billed,
-  .amount-section,
-  .terbilang-kwitansi,
-  .combined-row,
-  .payment-history-kwitansi,
-  .signature-section,
-  .footer {
+  .kwitansi-page .billed,
+  .kwitansi-page .amount-section,
+  .kwitansi-page .terbilang-kwitansi,
+  .kwitansi-page .combined-row,
+  .kwitansi-page .payment-history-kwitansi,
+  .kwitansi-page .signature-section,
+  .kwitansi-page .footer {
     margin-left: 0;
     margin-right: 0;
   }

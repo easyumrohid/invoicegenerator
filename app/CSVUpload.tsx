@@ -1,22 +1,25 @@
 "use client";
 
 import React, { useState, useRef } from "react";
-import { parseCSV, csvRowsToInvoiceData } from "./storage";
+import { parseCSV, csvRowsToInvoiceData, CSV_HEADERS, createCSVTemplate, downloadCSV } from "./storage";
 import type { InvoiceData } from "./types";
 
 interface Props {
-  onImport: (invoices: InvoiceData[]) => void;
+  onImport: (invoices: InvoiceData[]) => void | Promise<void>;
   onClose: () => void;
 }
 
 export default function CSVUpload({ onImport, onClose }: Props) {
+  const [importing, setImporting] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const [preview, setPreview] = useState<InvoiceData[] | null>(null);
   const [error, setError] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
   const handleFile = (file: File) => {
-    if (!file.name.endsWith(".csv")) {
+    setPreview(null);
+    if (file.size > 5 * 1024 * 1024) { setError("Ukuran file maksimal 5MB"); return; }
+    if (!file.name.toLowerCase().endsWith(".csv")) {
       setError("File harus berformat .csv");
       return;
     }
@@ -37,6 +40,7 @@ export default function CSVUpload({ onImport, onClose }: Props) {
         setError("Gagal memparse CSV: " + (err as Error).message);
       }
     };
+    reader.onerror = () => setError("File tidak dapat dibaca");
     reader.readAsText(file);
   };
 
@@ -69,7 +73,7 @@ export default function CSVUpload({ onImport, onClose }: Props) {
         justifyContent: "center",
         padding: "20px",
       }}
-      onClick={onClose}
+      onClick={() => {if (!importing) onClose();}}
     >
       <div
         style={{
@@ -86,28 +90,24 @@ export default function CSVUpload({ onImport, onClose }: Props) {
       >
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
           <h2 style={{ margin: 0, fontSize: "18px", color: "#051d76" }}>📁 Upload CSV</h2>
-          <button onClick={onClose} style={{ background: "none", border: "none", fontSize: "20px", cursor: "pointer", color: "#7783a8" }}>✕</button>
+          <button disabled={importing} onClick={onClose} style={{ background: "none", border: "none", fontSize: "20px", cursor: "pointer", color: "#7783a8" }}>✕</button>
         </div>
 
         {/* Template Download */}
         <div style={{ background: "#f0f4ff", borderRadius: "8px", padding: "12px 16px", marginBottom: "16px", fontSize: "12px", color: "#4a5568" }}>
           <b style={{ color: "#0d5bd7" }}>Format CSV yang didukung:</b>
-          <div style={{ marginTop: "6px", fontFamily: "monospace", fontSize: "11px", lineHeight: 1.5 }}>
-            nomor_invoice,tanggal,nama_customer,item_deskripsi,item_qty,item_harga_satuan,diskon,pajak,biaya_admin
+          <div style={{ marginTop: "6px", fontFamily: "monospace", fontSize: "11px", lineHeight: 1.5, overflowWrap: "anywhere" }}>
+            {CSV_HEADERS.join(",")}
           </div>
+          <p style={{margin: "8px 0", lineHeight: 1.6}}>
+            Mode biaya: <code>nominal</code> untuk Rp atau <code>percent</code> untuk % (contoh: 10, tanpa tanda %).
+            Kolom <code>riwayat_pembayaran_json</code> dan <code>rekening_bank_json</code> berisi array JSON; isi <code>[]</code> jika kosong.
+            Satu invoice boleh memakai beberapa baris item dengan nomor invoice yang sama.
+            Total dan status dihitung ulang otomatis saat impor.
+          </p>
+          <p style={{margin: "8px 0", lineHeight: 1.6}}>Template berisi contoh Mandiri, BNI, Cash, beberapa item, serta biaya Rp/%. Ganti nomor invoice, tanggal, dan data contoh sebelum impor; isi rekening dengan data asli.</p>
           <button
-            onClick={() => {
-              const template = `nomor_invoice,tanggal,nama_customer,referensi,item_deskripsi,item_sub_deskripsi,item_qty,item_harga_satuan,diskon,pajak,biaya_admin,bank,nomor_rekening,atas_nama
-INV-20260713-001,2026-07-13,Shukron Fauzi,REF-001,Paket Umroh 9 Hari,Hotel Bintang 4,1,15000000,0,0,0,Mandiri,1410042A111112,PT BERANDA HARAMAIN DIGITAL
-INV-20260713-002,2026-07-13,Onnaria,REF-002,City Tour Al-Ula,Tiket Masuk Maraya,2,690000,0,0,0,BNI,5111117474,PT BERANDA HARAMAIN DIGITAL`;
-              const blob = new Blob([template], { type: "text/csv" });
-              const url = URL.createObjectURL(blob);
-              const a = document.createElement("a");
-              a.href = url;
-              a.download = "template-invoice.csv";
-              a.click();
-              URL.revokeObjectURL(url);
-            }}
+            onClick={() => downloadCSV(createCSVTemplate(), "template-invoice.csv")}
             style={{ marginTop: "8px", background: "none", border: "none", color: "#0d5bd7", fontSize: "12px", cursor: "pointer", textDecoration: "underline", fontWeight: 600 }}
           >
             ⬇️ Download Template CSV
@@ -173,15 +173,19 @@ INV-20260713-002,2026-07-13,Onnaria,REF-002,City Tour Al-Ula,Tiket Masuk Maraya,
             </div>
             <div style={{ display: "flex", gap: "10px", marginTop: "16px" }}>
               <button
-                onClick={() => {
-                  onImport(preview);
-                  onClose();
+                disabled={importing}
+                onClick={async () => {
+                  setImporting(true);
+                  try { await onImport(preview); onClose(); }
+                  catch (err) { setError("Impor gagal: " + (err as Error).message); }
+                  finally {setImporting(false);}
                 }}
                 style={{ flex: 1, padding: "12px", background: "#0d5bd7", color: "#fff", border: "none", borderRadius: "8px", fontSize: "14px", fontWeight: 600, cursor: "pointer" }}
               >
-                ✅ Import {preview.length} Invoice
+                {importing ? "Menyimpan…" : `✅ Import ${preview.length} Invoice`}
               </button>
               <button
+                disabled={importing}
                 onClick={() => { setPreview(null); setError(""); }}
                 style={{ padding: "12px 20px", background: "#f8f9fc", color: "#4a5568", border: "1px solid #d0d5e4", borderRadius: "8px", fontSize: "14px", fontWeight: 600, cursor: "pointer" }}
               >

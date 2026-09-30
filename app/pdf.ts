@@ -58,14 +58,18 @@ async function elementToPDF(
 
   document.body.appendChild(wrapper);
 
+  try {
   // Force layout + tunggu gambar load
   void wrapper.offsetHeight;
-  await new Promise((r) => setTimeout(r, 500));
+  await document.fonts.ready;
+  await Promise.all(Array.from(wrapper.querySelectorAll("img")).map(async (image) => {
+    try { await image.decode(); }
+    catch { image.remove(); }
+  }));
 
   const width = A4_WIDTH_PX;
   const height = Math.max(Math.ceil(wrapper.scrollHeight), A4_HEIGHT_PX);
 
-  try {
     const dataUrl = await domtoimage.toPng(wrapper, {
       width: width,
       height: height,
@@ -81,7 +85,7 @@ async function elementToPDF(
         top: "0",
       },
       scale: 2,
-    } as any);
+    });
 
     const pdf = new jsPDF({
       orientation: "portrait",
@@ -95,21 +99,20 @@ async function elementToPDF(
 
     const img = new Image();
     img.src = dataUrl;
+    await img.decode();
 
-    await new Promise((resolve, reject) => {
-      img.onload = resolve;
-      img.onerror = reject;
-    });
 
-    const imgWidth = pdfWidth;
-    const imgHeight = (img.height * imgWidth) / img.width;
-
-    if (imgHeight <= pdfHeight) {
-      pdf.addImage(dataUrl, "PNG", 0, 0, imgWidth, imgHeight);
-    } else {
-      const scale = pdfWidth / img.width;
-      const scaledHeight = img.height * scale;
-      pdf.addImage(dataUrl, "PNG", 0, 0, pdfWidth, scaledHeight);
+    // Crop the raster into page-sized slices, so content below A4 is retained.
+    const pagePixels = Math.round(img.width * pdfHeight / pdfWidth);
+    for (let top = 0; top < img.height; top += pagePixels) {
+      if (top > 0) pdf.addPage();
+      const canvas = document.createElement("canvas");
+      canvas.width = img.width;
+      canvas.height = Math.min(pagePixels, img.height - top);
+      const ctx = canvas.getContext("2d");
+      if (!ctx) throw new Error("Canvas tidak tersedia");
+      ctx.drawImage(img, 0, top, img.width, canvas.height, 0, 0, canvas.width, canvas.height);
+      pdf.addImage(canvas.toDataURL("image/png"), "PNG", 0, 0, pdfWidth, canvas.height * pdfWidth / img.width);
     }
 
     pdf.save(fileName);

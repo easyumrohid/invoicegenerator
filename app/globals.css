@@ -95,3 +95,40 @@ body {
   visibility: hidden;
   pointer-events: none;
 }
+
+.form-container {
+  width: 480px;
+  flex-shrink: 0;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #fff;
+  color: #1a1a2e;
+}
+.form-container > .hint, .form-container > [role="alert"] {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 10px 24px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.form-container > .form-panel { flex: 1 1 0; min-height: 0; height: auto; }
+@media screen and (max-width: 900px) {
+  html, body { height: auto; overflow: auto; }
+  .page-shell { flex-direction: column; height: auto; overflow: visible; }
+  .form-container, .form-panel { width: 100%; min-width: 0; max-width: none; height: auto; }
+  .form-container { overflow: visible; }
+  .form-container > .form-panel { flex: none; overflow: visible; }
+  .preview-panel { height: auto; overflow: auto; align-items: flex-start; padding: 16px; }
+  .preview-stack { width: max-content; }
+}
+@media print {
+  @page { size: A4; margin: 10mm; }
+  html, body, .page-shell, .preview-panel, .preview-stack { height: auto; overflow: visible; display: block; background: white; margin: 0; padding: 0; }
+  .no-print, .kwitansi-hidden { display: none !important; }
+  .invoice-page, .kwitansi-page { width: 100%; box-shadow: none; }
+  .kwitansi-wrapper { display: block; break-before: page; }
+  tr, .banks, .sign { break-inside: avoid; }
+}
