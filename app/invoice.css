@@ -202,7 +202,7 @@
 .invoice-page .items td {
   padding: 10px 6px;
   border-bottom: 1px solid #e3e7f3;
-  vertical-align: middle;
+  vertical-align: top;
 }
 
 .invoice-page .items td:nth-child(2),
