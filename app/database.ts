@@ -1,6 +1,6 @@
 import { getSupabase } from './supabase';
 import { validateInvoice } from './validation';
-import { hitungBiaya, hitungDibayar, statusInvoice, tanggalHariIni } from './utils';
+import { statusPembayaran, hitungBiaya, hitungDibayar, statusInvoice, tanggalHariIni } from './utils';
 import type { InvoiceData } from './types';
 import type { InvoiceHistoryItem } from './storage';
 
@@ -17,7 +17,7 @@ function historyItem(row: {id: string; number: string; updated_at: string; data:
   const data = validateInvoice({...row.data as object, recordId: row.id, recordVersion: row.updated_at});
   const total = hitungBiaya(data).total, dibayar = hitungDibayar(data);
   return {id: row.id, nomorInvoice: row.number, namaCustomer: data.namaCustomer, tanggal: data.tanggal,
-    total, dibayar, status: statusInvoice(total, dibayar), dicetakPada: data.dicetakPada || '', data};
+    total, dibayar, status: statusPembayaran(data), dicetakPada: data.dicetakPada || '', data};
 }
 
 export async function loadCloudHistory(): Promise<InvoiceHistoryItem[]> {

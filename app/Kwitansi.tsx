@@ -107,6 +107,7 @@ const Kwitansi = forwardRef<HTMLDivElement, Props>(({ data }, ref) => {
             <div className="paid-box">
               <div className="paid-label">Total Diterima</div>
               <div className="paid-value">{rupiah(dibayar)}</div>
+              {(data.deposit ?? 0) > 0 && <div className="overpayment">Deposit Digunakan: {rupiah(data.deposit ?? 0)}<br />Dari {data.depositInvoice}<br />Total Pelunasan: {rupiah(dibayar + (data.deposit ?? 0))}</div>}
               <div className="paid-status">LUNAS</div>
               {kelebihan > 0 && <div className="overpayment">Kelebihan Pembayaran<br /><strong>{rupiah(kelebihan)}</strong></div>}
             </div>

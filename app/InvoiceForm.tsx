@@ -172,6 +172,8 @@ export default function InvoiceForm({ data, setData, invoiceRef, kwitansiRef, is
       setSaveMessage("");
       setData({
         ...dataRef.current,
+        deposit: 0,
+        depositInvoice: "",
         recordId: undefined,
         recordVersion: undefined,
         nomorInvoice: nextNumber,
@@ -401,6 +403,15 @@ export default function InvoiceForm({ data, setData, invoiceRef, kwitansiRef, is
       <button type="button" className="add-btn" onClick={tambahPembayaran}>
         + Tambah Cicilan
       </button>
+
+      <div className="section-title">Deposit dari INV Sebelumnya</div>
+      <label>Nomor INV Sumber Deposit
+        <input type="text" value={data.depositInvoice || ""} placeholder="INV-…" onChange={e => handleChange("depositInvoice", e.target.value)} />
+      </label>
+      <label>Deposit yang Digunakan (Rp)
+        <input type="text" inputMode="numeric" value={data.deposit || ""} placeholder="0" onChange={e => handleChange("deposit", parseAngka(e.target.value))} />
+      </label>
+      <p className="hint">Masukkan bagian saldo deposit yang dipakai untuk INV ini. Deposit mengurangi tagihan dan tidak dihitung sebagai transfer baru.</p>
 
       {/* ── PENGATURAN BIAYA ──────────────────────── */}
       <div className="section-title">Pengaturan Biaya</div>

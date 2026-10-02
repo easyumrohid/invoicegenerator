@@ -214,7 +214,7 @@ export function hitungBiaya(data: import("./types").InvoiceData) {
   const dasar = Math.max(0, subtotal - diskon);
   const tax = nominal(data.pajak, data.pajakMode, dasar);
   const serviceFee = nominal(data.biayaAdmin, data.biayaAdminMode, dasar);
-  return {subtotal, diskon, tax, serviceFee, total: dasar + tax + serviceFee};
+  return {subtotal, diskon, tax, serviceFee, total: Math.max(0, dasar + tax + serviceFee - (data.deposit ?? 0))};
 }
 
 export function labelPembayaran(p: {metode: string; bank?: string}): string {
@@ -248,4 +248,10 @@ export function pembayaranUntukCicilan(data: import("./types").InvoiceData): imp
 /** Kelebihan dihitung dari uang diterima, tanpa mengurangi nominal pembayaran. */
 export function hitungKelebihan(total: number, dibayar: number): number {
   return Math.max(dibayar - total, 0);
+}
+
+export function statusPembayaran(data: import("./types").InvoiceData) {
+  const total = hitungBiaya(data).total;
+  if (total === 0 && (data.deposit ?? 0) > 0 && hitungBiaya({...data, deposit: 0}).total > 0) return "LUNAS";
+  return statusInvoice(total, hitungDibayar(data));
 }

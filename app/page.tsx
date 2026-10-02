@@ -1,5 +1,5 @@
 "use client";
-import { hitungBiaya, labelPembayaran } from "./utils";
+import { statusPembayaran, hitungBiaya, labelPembayaran } from "./utils";
 
 import { hitungDibayar, tanggalHariIni } from "./utils";
 
@@ -96,7 +96,7 @@ function InvoiceWorkspace({userId}: {userId: string}) {
   // Calculate status for conditional kwitansi display
   const {total} = hitungBiaya(data);
   const dibayar = hitungDibayar(data);
-  const isLunas = dibayar >= total && total > 0;
+  const isLunas = statusPembayaran(data) === "LUNAS";
 
   return (
     <div className="page-shell">

@@ -278,6 +278,7 @@ export default function InvoiceHistory({ onLoadInvoice, onClose }: Props) {
                       <tr>
                         <td colSpan={5} style={{ padding: "0 8px 12px", background: "#fafbfd" }}>
                           {paymentProgress(h)}
+                          {(h.data.deposit ?? 0) > 0 && <p style={{fontSize:"12px",color:"#051d76"}}>Deposit digunakan: {rupiah(h.data.deposit ?? 0)} — dari {h.data.depositInvoice}</p>}
                           {h.data.riwayatPembayaran && h.data.riwayatPembayaran.length > 0 && (
                             <div style={{ marginTop: "8px" }}>
                               <div style={{ fontSize: "11px", fontWeight: 700, color: "#7783a8", textTransform: "uppercase", marginBottom: "4px" }}>Riwayat Cicilan:</div>

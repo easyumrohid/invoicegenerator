@@ -1,4 +1,4 @@
-import { hitungBiaya } from "./utils";
+import { statusPembayaran, hitungBiaya } from "./utils";
 import { validateInvoice } from "./validation";
 import { tanggalHariIni, hitungDibayar, statusInvoice } from "./utils";
 import { InvoiceData } from "./types";
@@ -79,7 +79,7 @@ export function saveImportedInvoices(invoices: InvoiceData[]) {
     const total = hitungBiaya(data).total;
     const dibayar = hitungDibayar(data);
     const index = history.findIndex(h => h.nomorInvoice === data.nomorInvoice);
-    const item: InvoiceHistoryItem = {id:index < 0 ? crypto.randomUUID() : history[index].id, nomorInvoice:data.nomorInvoice, namaCustomer:data.namaCustomer, tanggal:data.tanggal, total, dibayar, status:statusInvoice(total,dibayar), dicetakPada:data.dicetakPada || new Date().toISOString(), data};
+    const item: InvoiceHistoryItem = {id:index < 0 ? crypto.randomUUID() : history[index].id, nomorInvoice:data.nomorInvoice, namaCustomer:data.namaCustomer, tanggal:data.tanggal, total, dibayar, status:statusPembayaran(data), dicetakPada:data.dicetakPada || new Date().toISOString(), data};
     if (index < 0) history.unshift(item); else history[index] = item;
   }
   localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
@@ -98,7 +98,7 @@ export function loadHistory(): InvoiceHistoryItem[] {
         const data = validateInvoice(h.data);
         const total = hitungBiaya(data).total;
         const dibayar = hitungDibayar(data);
-        return [{...h, data, nomorInvoice: data.nomorInvoice, namaCustomer: data.namaCustomer, tanggal: data.tanggal, total, dibayar, status: statusInvoice(total, dibayar)}];
+        return [{...h, data, nomorInvoice: data.nomorInvoice, namaCustomer: data.namaCustomer, tanggal: data.tanggal, total, dibayar, status: statusPembayaran(data)}];
       } catch { return []; }
     });
   } catch {
@@ -138,6 +138,8 @@ export interface CSVRow {
   biayaAdminMode?: import("./types").FeeMode;
   pajak?: number;
   biayaAdmin?: number;
+  deposit?: number;
+  depositInvoice?: string;
   bank?: string;
   nomorRekening?: string;
   atasNama?: string;
@@ -197,7 +199,7 @@ export function parseCSV(text: string): CSVRow[] {
       itemQty:num("item_qty",1), itemHargaSatuan:num("item_harga_satuan"), diskon:num("diskon"), pajak:num("pajak",0,"tax"), biayaAdmin:num("biaya_admin",0,"admin","service_fee"),
       diskonMode:(get("diskon_mode") || "nominal") as import("./types").FeeMode, pajakMode:(get("tax_mode", "pajak_mode") || "nominal") as import("./types").FeeMode, biayaAdminMode:(get("service_fee_mode", "biaya_admin_mode") || "nominal") as import("./types").FeeMode,
       bank:get("bank"), nomorRekening:get("nomor_rekening","rekening"), atasNama:get("atas_nama","an"),
-      jumlahDibayar:num("dibayar"), metodePembayaran:get("metode_pembayaran"), tanggalBayar:get("tanggal_bayar"), riwayatJSON:get("riwayat_pembayaran_json"), rekeningJSON:get("rekening_bank_json") };
+      deposit:num("deposit"), depositInvoice:get("deposit_invoice"), jumlahDibayar:num("dibayar"), metodePembayaran:get("metode_pembayaran"), tanggalBayar:get("tanggal_bayar"), riwayatJSON:get("riwayat_pembayaran_json"), rekeningJSON:get("rekening_bank_json") };
   });
 }
 
@@ -216,7 +218,7 @@ export function csvRowsToInvoiceData(rows: CSVRow[]): InvoiceData[] {
   for (const [nomorInvoice, itemRows] of grouped) {
     const first = itemRows[0];
     for (const row of itemRows) {
-      for (const field of ["tanggal", "namaCustomer", "referensi", "diskon", "pajak", "biayaAdmin", "diskonMode", "pajakMode", "biayaAdminMode", "jumlahDibayar", "riwayatJSON", "rekeningJSON"] as const) {
+      for (const field of ["deposit", "depositInvoice", "tanggal", "namaCustomer", "referensi", "diskon", "pajak", "biayaAdmin", "diskonMode", "pajakMode", "biayaAdminMode", "jumlahDibayar", "riwayatJSON", "rekeningJSON"] as const) {
         if (row[field] !== first[field]) throw new Error(`Data invoice ${nomorInvoice} tidak konsisten pada kolom ${field}`);
       }
     }
@@ -249,6 +251,8 @@ export function csvRowsToInvoiceData(rows: CSVRow[]): InvoiceData[] {
       rekeningBank: first.rekeningJSON ? JSON.parse(first.rekeningJSON) : banks,
       metodePembayaran: first.metodePembayaran || "Transfer Bank",
       tanggalBayar: first.tanggalBayar || "",
+      deposit: first.deposit ?? 0,
+      depositInvoice: first.depositInvoice || "",
       jumlahDibayar: first.jumlahDibayar ?? 0,
       diskon: first.diskon || 0,
       diskonMode: first.diskonMode,
@@ -263,7 +267,7 @@ export function csvRowsToInvoiceData(rows: CSVRow[]): InvoiceData[] {
   return invoices;
 }
 
-export const CSV_HEADERS = ["nomor_invoice","tanggal","nama_customer","referensi","item_deskripsi","item_sub_deskripsi","item_qty","item_harga_satuan","diskon","tax","service_fee","dibayar","metode_pembayaran","tanggal_bayar","riwayat_pembayaran_json","rekening_bank_json","diskon_mode","tax_mode","service_fee_mode","total","status"] as const;
+export const CSV_HEADERS = ["nomor_invoice","tanggal","nama_customer","referensi","item_deskripsi","item_sub_deskripsi","item_qty","item_harga_satuan","diskon","tax","service_fee","dibayar","metode_pembayaran","tanggal_bayar","riwayat_pembayaran_json","rekening_bank_json","diskon_mode","tax_mode","service_fee_mode","total","status","deposit","deposit_invoice"] as const;
 
 export function exportCSV(invoices: InvoiceHistoryItem[]): string {
   const headers = CSV_HEADERS;
@@ -271,7 +275,7 @@ export function exportCSV(invoices: InvoiceHistoryItem[]): string {
   const rows = [headers.join(",")];
   for (const inv of invoices) for (const item of inv.data.items) {
     const d = inv.data;
-    rows.push([d.nomorInvoice,d.tanggal,d.namaCustomer,d.referensi,item.deskripsi,item.subDeskripsi,item.qty !== undefined && item.hargaSatuan !== undefined ? item.qty : 1,item.qty !== undefined && item.hargaSatuan !== undefined ? item.hargaSatuan : item.jumlah,d.diskon ?? 0,d.pajak ?? 0,d.biayaAdmin ?? 0,hitungDibayar(d),d.metodePembayaran,d.tanggalBayar,d.riwayatPembayaran === undefined ? "" : JSON.stringify(d.riwayatPembayaran),JSON.stringify(d.rekeningBank),d.diskonMode ?? "nominal",d.pajakMode ?? "nominal",d.biayaAdminMode ?? "nominal",hitungBiaya(d).total,statusInvoice(hitungBiaya(d).total,hitungDibayar(d))].map(escape).join(","));
+    rows.push([d.nomorInvoice,d.tanggal,d.namaCustomer,d.referensi,item.deskripsi,item.subDeskripsi,item.qty !== undefined && item.hargaSatuan !== undefined ? item.qty : 1,item.qty !== undefined && item.hargaSatuan !== undefined ? item.hargaSatuan : item.jumlah,d.diskon ?? 0,d.pajak ?? 0,d.biayaAdmin ?? 0,hitungDibayar(d),d.metodePembayaran,d.tanggalBayar,d.riwayatPembayaran === undefined ? "" : JSON.stringify(d.riwayatPembayaran),JSON.stringify(d.rekeningBank),d.diskonMode ?? "nominal",d.pajakMode ?? "nominal",d.biayaAdminMode ?? "nominal",hitungBiaya(d).total,statusPembayaran(d),d.deposit ?? 0,d.depositInvoice ?? ""].map(escape).join(","));
   }
   return "\uFEFF" + rows.join("\r\n");
 }
@@ -302,7 +306,7 @@ export function createCSVTemplate(): string {
   };
   return exportCSV([example,cash].map((data,index) => {
     const total = hitungBiaya(data).total, dibayar = hitungDibayar(data);
-    return {id:`template-${index}`, nomorInvoice:data.nomorInvoice, namaCustomer:data.namaCustomer, tanggal:data.tanggal, total, dibayar, status:statusInvoice(total,dibayar), dicetakPada:"", data};
+    return {id:`template-${index}`, nomorInvoice:data.nomorInvoice, namaCustomer:data.namaCustomer, tanggal:data.tanggal, total, dibayar, status:statusPembayaran(data), dicetakPada:"", data};
   }));
 }
 

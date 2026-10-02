@@ -1,5 +1,5 @@
 "use client";
-import { hitungKelebihan, hitungBiaya, labelPembayaran } from "./utils";
+import { statusPembayaran, hitungKelebihan, hitungBiaya, labelPembayaran } from "./utils";
 
 import { hitungDibayar, tanggalHariIni } from "./utils";
 
@@ -27,7 +27,7 @@ const Invoice = forwardRef<HTMLDivElement, Props>(({ data }, ref) => {
   const dibayar = hitungDibayar(data);
 
   const sisa = Math.max(total - dibayar, 0);
-  const status = statusInvoice(total, dibayar);
+  const status = statusPembayaran(data);
 
   const badgeClass =
     status === "LUNAS"
@@ -161,6 +161,10 @@ const Invoice = forwardRef<HTMLDivElement, Props>(({ data }, ref) => {
               </div>
             )}
 
+            {(data.deposit ?? 0) > 0 && <>
+              <div className="totals-row"><span>Total Sebelum Deposit</span><span>{rupiah(hitungBiaya({...data, deposit: 0}).total)}</span></div>
+              <div className="totals-row"><span>Deposit dari {data.depositInvoice}</span><span>- {rupiah(data.deposit ?? 0)}</span></div>
+            </>}
             <div className="totals-row grand">
               <span>Total</span>
               <span>{rupiah(total)}</span>

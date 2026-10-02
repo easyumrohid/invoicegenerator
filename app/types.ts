@@ -33,6 +33,8 @@ export interface RiwayatPembayaran {
 }
 
 export interface InvoiceData {
+  deposit?: number; // Kredit dari kelebihan pembayaran invoice sebelumnya.
+  depositInvoice?: string; // Nomor invoice sumber deposit.
   recordId?: string; // ID database; tetap sama saat mengedit invoice.
   recordVersion?: string; // Mencegah perubahan perangkat lain tertimpa.
   nomorInvoice: string;
