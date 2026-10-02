@@ -161,14 +161,14 @@ const Invoice = forwardRef<HTMLDivElement, Props>(({ data }, ref) => {
               </div>
             )}
 
-            {(data.deposit ?? 0) > 0 && <>
-              <div className="totals-row"><span>Total Sebelum Deposit</span><span>{rupiah(hitungBiaya({...data, deposit: 0}).total)}</span></div>
-              <div className="totals-row"><span>Deposit dari {data.depositInvoice}</span><span>- {rupiah(data.deposit ?? 0)}</span></div>
-            </>}
             <div className="totals-row grand">
               <span>Total</span>
-              <span>{rupiah(total)}</span>
+              <span>{rupiah(hitungBiaya({...data, deposit: 0}).total)}</span>
             </div>
+            {(data.deposit ?? 0) > 0 && <>
+              <div className="totals-row"><span>Deposit dari {data.depositInvoice}</span><span>- {rupiah(data.deposit ?? 0)}</span></div>
+              <div className="totals-row grand"><span>Tagihan Setelah Deposit</span><span>{rupiah(total)}</span></div>
+            </>}
 
             <div className="totals-row paid-summary">
               <span>Sudah Dibayar</span>

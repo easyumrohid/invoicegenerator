@@ -255,3 +255,9 @@ export function statusPembayaran(data: import("./types").InvoiceData) {
   if (total === 0 && (data.deposit ?? 0) > 0 && hitungBiaya({...data, deposit: 0}).total > 0) return "LUNAS";
   return statusInvoice(total, hitungDibayar(data));
 }
+
+/** Saldo sumber setelah pemakaian deposit pada riwayat yang masih tersedia. */
+export function saldoDepositRiwayat(history: {data: import("./types").InvoiceData}[], source: import("./types").InvoiceData, currentNumber: string) {
+  const used = history.reduce((sum, h) => h.data.nomorInvoice !== currentNumber && h.data.depositInvoice?.trim() === source.nomorInvoice.trim() ? sum + (h.data.deposit ?? 0) : sum, 0);
+  return Math.max(0, hitungKelebihan(hitungBiaya(source).total, hitungDibayar(source)) - used);
+}

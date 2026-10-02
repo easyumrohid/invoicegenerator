@@ -1,5 +1,5 @@
 "use client";
-import { hitungBiaya, labelPembayaran, pembayaranUntukCicilan } from "./utils";
+import { saldoDepositRiwayat, rupiah, hitungBiaya, labelPembayaran, pembayaranUntukCicilan } from "./utils";
 
 import { hitungDibayar, tanggalHariIni } from "./utils";
 
@@ -9,7 +9,7 @@ import { exportPDF, exportKwitansiPDF } from "./pdf";
 import { BANK_OPTIONS } from "./constants";
 import { generateKwitansiNumber } from "./utils";
 import { exportJSON } from "./storage";
-import { suggestCloudNumber, saveCloudInvoice, importCloudInvoices, databaseError } from "./database";
+import { loadCloudHistory, suggestCloudNumber, saveCloudInvoice, importCloudInvoices, databaseError } from "./database";
 import { useRef } from "react";
 import type { InvoiceData } from "./types";
 import { statusInvoice } from "./utils";
@@ -26,6 +26,16 @@ type Props = {
 };
 
 export default function InvoiceForm({ data, setData, invoiceRef, kwitansiRef, isLunas }: Props) {
+  const [depositHistory, setDepositHistory] = useState<InvoiceHistoryItem[] | null>(null);
+  const [depositSearch, setDepositSearch] = useState("");
+  const [depositLoading, setDepositLoading] = useState(false);
+  const [depositError, setDepositError] = useState("");
+  const openDepositHistory = async () => {
+    setDepositLoading(true); setDepositError("");
+    try { setDepositHistory(await loadCloudHistory()); }
+    catch (e) { setDepositError(databaseError(e)); }
+    finally { setDepositLoading(false); }
+  };
   const [showCSV, setShowCSV] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
@@ -405,13 +415,34 @@ export default function InvoiceForm({ data, setData, invoiceRef, kwitansiRef, is
       </button>
 
       <div className="section-title">Deposit dari INV Sebelumnya</div>
+      <button type="button" className="add-btn" disabled={depositLoading} onClick={openDepositHistory}>
+        {depositLoading ? "Memuat riwayat…" : "Cari Deposit dari Riwayat INV"}
+      </button>
+      {depositError && <p role="alert">{depositError}</p>}
+      {depositHistory !== null && <div className="deposit-picker">
+        <label>Cari INV atau Nama Customer
+          <input value={depositSearch} onChange={e => setDepositSearch(e.target.value)} />
+        </label>
+        <div className="deposit-results">
+          {depositHistory.filter(h => h.nomorInvoice !== data.nomorInvoice && saldoDepositRiwayat(depositHistory, h.data, data.nomorInvoice) > 0 && `${h.nomorInvoice} ${h.namaCustomer}`.toLowerCase().includes(depositSearch.toLowerCase())).map(h => {
+            const saldo = saldoDepositRiwayat(depositHistory, h.data, data.nomorInvoice);
+            return <button type="button" key={h.id} onClick={() => {
+              const current = dataRef.current;
+              setData({...current, depositInvoice: h.nomorInvoice, deposit: Math.min(saldo, hitungBiaya({...current, deposit: 0}).total)});
+              setDepositHistory(null); setDepositSearch("");
+            }}><strong>{h.nomorInvoice}</strong><br />{h.namaCustomer}<br />Saldo tersedia: {rupiah(saldo)}</button>;
+          })}
+          {!depositHistory.some(h => h.nomorInvoice !== data.nomorInvoice && saldoDepositRiwayat(depositHistory, h.data, data.nomorInvoice) > 0 && `${h.nomorInvoice} ${h.namaCustomer}`.toLowerCase().includes(depositSearch.toLowerCase())) && <p>Tidak ada deposit yang cocok. Gunakan input manual jika INV sudah dihapus.</p>}
+        </div>
+        <button type="button" onClick={() => setDepositHistory(null)}>Tutup Pencarian</button>
+      </div>}
       <label>Nomor INV Sumber Deposit
         <input type="text" value={data.depositInvoice || ""} placeholder="INV-…" onChange={e => handleChange("depositInvoice", e.target.value)} />
       </label>
       <label>Deposit yang Digunakan (Rp)
         <input type="text" inputMode="numeric" value={data.deposit || ""} placeholder="0" onChange={e => handleChange("deposit", parseAngka(e.target.value))} />
       </label>
-      <p className="hint">Masukkan bagian saldo deposit yang dipakai untuk INV ini. Deposit mengurangi tagihan dan tidak dihitung sebagai transfer baru.</p>
+      <p className="hint">Pilih dari riwayat atau isi manual jika INV asal sudah dihapus. Nominal otomatis dibatasi sebesar total tagihan. Deposit mengurangi tagihan dan tidak dihitung sebagai transfer baru.</p>
 
       {/* ── PENGATURAN BIAYA ──────────────────────── */}
       <div className="section-title">Pengaturan Biaya</div>
