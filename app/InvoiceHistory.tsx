@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { exportCSV, downloadCSV } from "./storage";
 import { loadCloudHistory, deleteCloudInvoices, databaseError } from "./database";
 import type { InvoiceHistoryItem } from "./storage";
-import { rupiah, ringkasanPembayaran, tanggalDalamRentang, labelPembayaran } from "./utils";
+import { hitungKelebihan, rupiah, ringkasanPembayaran, tanggalDalamRentang, labelPembayaran } from "./utils";
 
 interface Props {
   onLoadInvoice: (data: InvoiceHistoryItem) => void;
@@ -40,6 +40,7 @@ export default function InvoiceHistory({ onLoadInvoice, onClose }: Props) {
 
   const paymentTotals = ringkasanPembayaran(filtered.map(h => h.data));
   const totalRevenue = filtered.reduce((sum, h) => sum + h.dibayar, 0);
+  const totalOverpayment = filtered.reduce((sum, h) => sum + hitungKelebihan(h.total, h.dibayar), 0);
   const totalOutstanding = filtered.reduce((sum, h) => sum + Math.max(h.total - h.dibayar, 0), 0);
 
   const handleDelete = async (items: InvoiceHistoryItem[]) => {
@@ -173,6 +174,10 @@ export default function InvoiceHistory({ onLoadInvoice, onClose }: Props) {
             <div style={{ fontSize: "11px", color: "#7783a8", textTransform: "uppercase", fontWeight: 700, letterSpacing: "0.05em" }}>Sisa Tagihan</div>
             <div style={{ fontSize: "20px", fontWeight: 800, color: "#c0392b", marginTop: "4px" }}>{rupiah(totalOutstanding)}</div>
           </div>
+          <div style={{ flex: 1, background: "#fff", padding: "14px", borderRadius: "10px", border: "1px solid #e3e7f3" }}>
+            <div style={{fontSize: "11px", color: "#7783a8"}}>Kelebihan Pembayaran</div>
+            <strong style={{color: "#9a6700"}}>{rupiah(totalOverpayment)}</strong>
+          </div>
         </div>
 
         <div style={{padding: "0 24px 16px", display: "flex", flexWrap: "wrap", gap: "12px", background: "#f8f9fc"}}>
@@ -250,7 +255,9 @@ export default function InvoiceHistory({ onLoadInvoice, onClose }: Props) {
                         <div>{rupiah(h.total)}</div>
                         <div style={{ fontSize: "11px", color: "#0f8a4d" }}>{rupiah(h.dibayar)}</div>
                       </td>
-                      <td style={{ padding: "10px 8px", textAlign: "center" }}>{statusBadge(h.status)}</td>
+                      <td style={{ padding: "10px 8px", textAlign: "center" }}>{statusBadge(h.status)}
+                        {h.dibayar > h.total && <div style={{fontSize: "11px", color: "#9a6700", marginTop: "6px"}}>Kelebihan Pembayaran: {rupiah(hitungKelebihan(h.total, h.dibayar))}</div>}
+                      </td>
                       <td style={{ padding: "10px 8px", textAlign: "center" }}>
                         <button
                           onClick={(e) => { e.stopPropagation(); onLoadInvoice(h); }}

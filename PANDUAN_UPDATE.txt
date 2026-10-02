@@ -1,0 +1,3 @@
+Salin folder app dari ZIP ini ke folder project Next.js Anda dan timpa file lama. Folder tests opsional untuk pengujian. Environment .env.local Anda tetap dipakai. Tidak perlu mengubah SQL Supabase. Jalankan npm run build, lalu commit dan push ke GitHub untuk deploy ulang.
+
+Kelebihan Pembayaran = total diterima dikurangi total tagihan, minimum nol. Nominal pembayaran tetap utuh. Subdeskripsi mendukung Enter dan dibawa ke CSV/database.

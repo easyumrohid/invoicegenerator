@@ -27,3 +27,17 @@ test('payment totals split mixed installments and Cash wins over stale bank',asy
 test('date range is inclusive and accepts one-sided filters',async()=>{const {tanggalDalamRentang}=await import('../app/utils');assert.equal(tanggalDalamRentang('2026-09-30','2026-09-30','2026-09-30'),true);assert.equal(tanggalDalamRentang('2026-09-29','2026-09-30'),false);assert.equal(tanggalDalamRentang('2026-10-01','','2026-09-30'),false);assert.equal(tanggalDalamRentang('2026-09-30','2026-10-01','2026-09-29'),false);});
 test('converting old single Cash payment to installments preserves method and date',async()=>{const {pembayaranUntukCicilan}=await import('../app/utils');assert.deepEqual(pembayaranUntukCicilan({...invoice(),metodePembayaran:'Cash'}),[{tanggal:'2026-09-30',metode:'Cash',jumlah:100}]);assert.deepEqual(pembayaranUntukCicilan({...invoice(),riwayatPembayaran:[]}),[]);});
 test('downloadable template uses current columns and payment/bank arrays',async()=>{const {CSV_HEADERS,createCSVTemplate}=await import('../app/storage');const text=createCSVTemplate();assert.equal(text.replace(/^\uFEFF/,'').split('\r\n')[0],CSV_HEADERS.join(','));const invoices=csvRowsToInvoiceData(parseCSV(text));assert.equal(invoices.length,2);assert.equal(invoices[0].items.length,2);assert.equal(invoices[0].rekeningBank.length,2);assert.deepEqual(invoices[0].riwayatPembayaran?.map(p=>p.bank),['Mandiri','BNI']);assert.equal(invoices[1].riwayatPembayaran?.[0].metode,'Cash');assert.equal(invoices[0].diskonMode,'percent');assert.equal(invoices[0].biayaAdminMode,'nominal');});
+
+test('overpayment uses final total and preserves multiline subdescription through CSV',async()=>{
+  const {hitungBiaya,hitungKelebihan}=await import('../app/utils');
+  const d={...invoice(),pajak:20,biayaAdmin:10,items:[{...invoice().items[0],subDeskripsi:'Hotel dekat masjid\nKamar untuk 2 orang, termasuk sarapan'}],riwayatPembayaran:[{tanggal:'2026-09-30',metode:'Cash',jumlah:300}]};
+  const total=hitungBiaya(d).total;
+  assert.equal(total,230);
+  assert.equal(hitungKelebihan(total,hitungDibayar(d)),70);
+  assert.equal(hitungKelebihan(total,230),0);
+  assert.equal(hitungKelebihan(total,100),0);
+  saveToHistory(d,total,300,'LUNAS');
+  const restored=csvRowsToInvoiceData(parseCSV(exportCSV(loadHistory())))[0];
+  assert.equal(restored.items[0].subDeskripsi,d.items[0].subDeskripsi);
+  assert.equal(hitungKelebihan(hitungBiaya(restored).total,hitungDibayar(restored)),70);
+});

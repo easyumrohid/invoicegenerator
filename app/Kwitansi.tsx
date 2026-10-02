@@ -1,5 +1,5 @@
 "use client";
-import { labelPembayaran } from "./utils";
+import { hitungBiaya, hitungKelebihan, labelPembayaran } from "./utils";
 
 import { hitungDibayar, tanggalHariIni } from "./utils";
 
@@ -21,6 +21,7 @@ type Props = {
 
 const Kwitansi = forwardRef<HTMLDivElement, Props>(({ data }, ref) => {
   const dibayar = hitungDibayar(data);
+  const kelebihan = hitungKelebihan(hitungBiaya(data).total, dibayar);
 
   const nomorKwitansi = generateKwitansiNumber(data.nomorInvoice);
 
@@ -107,6 +108,7 @@ const Kwitansi = forwardRef<HTMLDivElement, Props>(({ data }, ref) => {
               <div className="paid-label">Total Diterima</div>
               <div className="paid-value">{rupiah(dibayar)}</div>
               <div className="paid-status">LUNAS</div>
+              {kelebihan > 0 && <div className="overpayment">Kelebihan Pembayaran<br /><strong>{rupiah(kelebihan)}</strong></div>}
             </div>
           </section>
         </div>

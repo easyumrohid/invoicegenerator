@@ -212,3 +212,6 @@
     display: none !important;
   }
 }
+
+.form-panel { overflow-anchor: none; }
+.form-panel textarea { width:100%; box-sizing:border-box; min-height:90px; resize:vertical; padding:10px; border:1px solid #d0d5e4; border-radius:8px; font:inherit; }

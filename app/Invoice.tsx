@@ -1,5 +1,5 @@
 "use client";
-import { hitungBiaya, labelPembayaran } from "./utils";
+import { hitungKelebihan, hitungBiaya, labelPembayaran } from "./utils";
 
 import { hitungDibayar, tanggalHariIni } from "./utils";
 
@@ -190,6 +190,12 @@ const Invoice = forwardRef<HTMLDivElement, Props>(({ data }, ref) => {
               <span>Sisa Tagihan</span>
               <span>{rupiah(sisa)}</span>
             </div>
+            {hitungKelebihan(total, dibayar) > 0 && (
+              <div className="totals-row overpayment">
+                <span>Kelebihan Pembayaran</span>
+                <span>{rupiah(hitungKelebihan(total, dibayar))}</span>
+              </div>
+            )}
           </div>
         </section>
 

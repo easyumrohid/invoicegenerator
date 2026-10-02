@@ -3,7 +3,7 @@ import { hitungBiaya, labelPembayaran, pembayaranUntukCicilan } from "./utils";
 
 import { hitungDibayar, tanggalHariIni } from "./utils";
 
-import React, { useState } from "react";
+import React, { useState, useLayoutEffect } from "react";
 import "@/app/invoice-form.css";
 import { exportPDF, exportKwitansiPDF } from "./pdf";
 import { BANK_OPTIONS } from "./constants";
@@ -30,6 +30,18 @@ export default function InvoiceForm({ data, setData, invoiceRef, kwitansiRef, is
   const [showHistory, setShowHistory] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
 
+  const panelRef = useRef<HTMLDivElement>(null);
+  const pendingScroll = useRef<{panel: number; window: number} | null>(null);
+  const rememberScroll = () => {
+    pendingScroll.current = {panel: panelRef.current?.scrollTop ?? 0, window: window.scrollY};
+  };
+  useLayoutEffect(() => {
+    const position = pendingScroll.current;
+    if (!position) return;
+    pendingScroll.current = null;
+    if (panelRef.current) panelRef.current.scrollTop = position.panel;
+    window.scrollTo({top: position.window, behavior: "instant"});
+  }, [data]);
   const numberRequest = useRef(0);
   const dataRef = useRef(data);
   dataRef.current = data;
@@ -92,6 +104,7 @@ export default function InvoiceForm({ data, setData, invoiceRef, kwitansiRef, is
 
   // --- HANDLER RIWAYAT PEMBAYARAN (CICILAN) ---
   const tambahPembayaran = () => {
+    rememberScroll();
     const newItem = {
       tanggal: tanggalHariIni(),
       metode: "Transfer Bank",
@@ -110,6 +123,7 @@ export default function InvoiceForm({ data, setData, invoiceRef, kwitansiRef, is
   };
 
   const hapusPembayaran = (index: number) => {
+    rememberScroll();
     const newRiwayat = [...(data.riwayatPembayaran || [])];
     newRiwayat.splice(index, 1);
     setData({ ...data, riwayatPembayaran: newRiwayat });
@@ -206,7 +220,8 @@ export default function InvoiceForm({ data, setData, invoiceRef, kwitansiRef, is
   };
 
   return (
-    <fieldset className="form-panel no-print" disabled={isSaving || isDownloading || isResetting} style={{border:0, margin:0, minWidth:0}}>
+    <div ref={panelRef} className="form-panel no-print">
+    <fieldset disabled={isSaving || isDownloading || isResetting} style={{border:0, margin:0, padding:0, minWidth:0}}>
       <h1>Pengaturan Invoice</h1>
       <button type="button" disabled={isSaving || isDownloading} onClick={handleSave}>{isSaving ? "Menyimpan…" : "Simpan INV"}</button>
       {saveMessage && <p role="status">{saveMessage}</p>}
@@ -295,8 +310,8 @@ export default function InvoiceForm({ data, setData, invoiceRef, kwitansiRef, is
 
           <label>
             Sub-Deskripsi (Opsional)
-            <input
-              type="text"
+            <textarea
+              rows={4}
               value={item.subDeskripsi || ""}
               onChange={(e) => updateItem(index, "subDeskripsi", e.target.value)}
             />
@@ -445,5 +460,6 @@ export default function InvoiceForm({ data, setData, invoiceRef, kwitansiRef, is
       {showCSV && <CSVUpload onImport={handleCSVImport} onClose={() => setShowCSV(false)} />}
       {showHistory && <InvoiceHistory onLoadInvoice={handleLoadFromHistory} onClose={() => setShowHistory(false)} />}
     </fieldset>
+    </div>
   );
 }

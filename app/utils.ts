@@ -244,3 +244,8 @@ export function pembayaranUntukCicilan(data: import("./types").InvoiceData): imp
   if (data.jumlahDibayar <= 0) return [];
   return [{tanggal: data.tanggalBayar || data.tanggal, metode: data.metodePembayaran, jumlah: data.jumlahDibayar}];
 }
+
+/** Kelebihan dihitung dari uang diterima, tanpa mengurangi nominal pembayaran. */
+export function hitungKelebihan(total: number, dibayar: number): number {
+  return Math.max(dibayar - total, 0);
+}

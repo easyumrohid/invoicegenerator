@@ -469,3 +469,7 @@
     margin-right: 0;
   }
 }
+
+.kwitansi-page .payment-sub { white-space:pre-wrap; overflow-wrap:anywhere; }
+.kwitansi-page .payment-items { min-width:0; overflow-wrap:anywhere; }
+.kwitansi-page .overpayment { margin-top:12px; color:#9a6700; font-size:12px; }
