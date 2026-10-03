@@ -127,6 +127,8 @@ async function elementToPDF(
 
 
     const margin = 8;
+    // Halaman pertama dimulai dari tepi atas agar header tetap penuh.
+    // Kapasitas bersama mengikuti halaman lanjutan yang memiliki margin atas.
     const contentHeight = pdfHeight - margin * 2;
     const scale = img.height / height;
     const capacity = Math.floor(img.width * contentHeight / pdfWidth);
@@ -143,7 +145,7 @@ async function elementToPDF(
       ctx.fillStyle = "#ffffff";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(img, 0, page.top, img.width, canvas.height, 0, 0, canvas.width, canvas.height);
-      pdf.addImage(canvas.toDataURL("image/png"), "PNG", 0, margin, pdfWidth, canvas.height * pdfWidth / img.width);
+      pdf.addImage(canvas.toDataURL("image/png"), "PNG", 0, index === 0 ? 0 : margin, pdfWidth, canvas.height * pdfWidth / img.width);
       if (pages.length > 1) {
         pdf.setFontSize(8);
         pdf.setTextColor(100);
