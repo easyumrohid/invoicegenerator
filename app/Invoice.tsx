@@ -127,12 +127,25 @@ const Invoice = forwardRef<HTMLDivElement, Props>(({ data }, ref) => {
           </table>
         </section>
 
-        {/* TOTALS & TERBILANG — SIDE BY SIDE */}
+        {/* RINGKASAN NOMINAL */}
         <section className="summary-section">
-          <div className="terbilang-col">
-            <div className="title">Terbilang</div>
-            <div className="text">{terbilang(total)}</div>
-          </div>
+        {data.riwayatPembayaran && data.riwayatPembayaran.length > 0 && (
+          <section className="installment-section">
+            <h2>Rincian Pembayaran</h2>
+            <table>
+              <thead><tr><th>Tanggal</th><th>Metode Pembayaran</th><th>Nominal</th></tr></thead>
+              <tbody>{data.riwayatPembayaran.map((bayar, index) => (
+                <tr key={index}>
+                  <td>{formatTanggal(bayar.tanggal as string)}</td>
+                  <td>{labelPembayaran(bayar)}</td>
+                  <td>{rupiah(bayar.jumlah)}</td>
+                </tr>
+              ))}</tbody>
+            </table>
+          </section>
+        )}
+
+
 
           <div className="totals-box">
             <div className="totals-row">
@@ -175,21 +188,6 @@ const Invoice = forwardRef<HTMLDivElement, Props>(({ data }, ref) => {
               <span>{rupiah(dibayar)}</span>
             </div>
 
-            {/* Looping data riwayat pembayaran jika ada */}
-            {data.riwayatPembayaran && data.riwayatPembayaran.length > 0 && (
-              <div className="payment-history">
-                {data.riwayatPembayaran.map((bayar, index) => (
-                  <div 
-                    key={index} 
-                    className="totals-row payment-history-item"
-                  >
-                    <span>↳ {formatTanggal(bayar.tanggal as string)} — {labelPembayaran(bayar)}</span>
-                    <span>{rupiah(bayar.jumlah)}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-
             <div className="totals-row due">
               <span>Sisa Tagihan</span>
               <span>{rupiah(sisa)}</span>
@@ -201,6 +199,14 @@ const Invoice = forwardRef<HTMLDivElement, Props>(({ data }, ref) => {
               </div>
             )}
           </div>
+        </section>
+
+        <section className="terbilang-section">
+          <div className="terbilang-col">
+            <div className="title">Terbilang</div>
+            <div className="text">{terbilang(total)}</div>
+          </div>
+
         </section>
 
         {/* BANK ACCOUNTS */}
@@ -220,6 +226,8 @@ const Invoice = forwardRef<HTMLDivElement, Props>(({ data }, ref) => {
             ))
           )}
         </section>
+
+
 
         <section className="invoice-note">
           <div className="note-left">

@@ -41,3 +41,29 @@ test('overpayment uses final total and preserves multiline subdescription throug
   assert.equal(restored.items[0].subDeskripsi,d.items[0].subDeskripsi);
   assert.equal(hitungKelebihan(hitungBiaya(restored).total,hitungDibayar(restored)),70);
 });
+
+test('deposit reduces bill without duplicating cash receipts and survives CSV', async()=>{
+ const {hitungBiaya,statusPembayaran,ringkasanPembayaran}=await import('../app/utils');
+ const d={...invoice(),deposit:150,depositInvoice:'INV-OLD',jumlahDibayar:50,metodePembayaran:'Cash'};
+ assert.equal(hitungBiaya(d).total,50);
+ assert.equal(hitungDibayar(d),50);
+ assert.equal(statusPembayaran(d),'LUNAS');
+ assert.equal(ringkasanPembayaran([d]).Cash,50);
+ saveToHistory(d,50,50,'LUNAS');
+ const restored=csvRowsToInvoiceData(parseCSV(exportCSV(loadHistory())))[0];
+ assert.equal(restored.deposit,150);assert.equal(restored.depositInvoice,'INV-OLD');
+ assert.equal(statusPembayaran({...d,deposit:200,jumlahDibayar:0}),'LUNAS');
+ assert.throws(()=>validateInvoice({...d,deposit:201}));
+ assert.throws(()=>validateInvoice({...d,depositInvoice:d.nomorInvoice}));
+ assert.throws(()=>validateInvoice({...d,depositInvoice:''}));
+});
+
+test('deposit picker deducts recorded usage, excludes current edit and clamps spent balance',async()=>{
+ const {saldoDepositRiwayat}=await import('../app/utils');
+ const source={...invoice(),jumlahDibayar:500};
+ const applied={...invoice(),nomorInvoice:'INV-NEW',depositInvoice:source.nomorInvoice,deposit:100};
+ const history=[{data:source},{data:applied}];
+ assert.equal(saldoDepositRiwayat(history,source,'OTHER'),200);
+ assert.equal(saldoDepositRiwayat(history,source,'INV-NEW'),300);
+ assert.equal(saldoDepositRiwayat([{data:source},{data:{...applied,deposit:400}}],source,'OTHER'),0);
+});

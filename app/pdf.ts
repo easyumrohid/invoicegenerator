@@ -73,7 +73,7 @@ async function elementToPDF(
   const width = A4_WIDTH_PX;
   const height = Math.ceil(wrapper.scrollHeight);
   const origin = wrapper.getBoundingClientRect().top;
-  const blocks = Array.from(wrapper.querySelectorAll("tr, .head, .billed, .summary-section, .footer, .invoice-note, .banks, .signature-section, .sign, .combined-row, .terbilang-kwitansi, .amount-section"))
+  const blocks = Array.from(wrapper.querySelectorAll("tr, .head, .billed, .summary-section, .terbilang-section, .footer, .invoice-note, .banks, .signature-section, .sign, .combined-row, .terbilang-kwitansi, .amount-section"))
     .map(node => { const rect = node.getBoundingClientRect(); return {top: rect.top - origin, bottom: rect.bottom - origin}; });
 
     // Range menghasilkan kotak per baris, termasuk Enter pada subdeskripsi.

@@ -601,3 +601,44 @@
 
 .invoice-page .item-sub { white-space:pre-wrap; overflow-wrap:anywhere; }
 .invoice-page .overpayment { color:#9a6700; font-weight:700; }
+
+/* Ringkasan, terbilang, dan cicilan memiliki tinggi masing-masing. */
+.invoice-page .summary-section { justify-content:flex-end; }
+.invoice-page .totals-box { width:380px; max-width:100%; }
+.invoice-page .totals-row { gap:16px; align-items:flex-start; }
+.invoice-page .totals-row > span:first-child { min-width:0; overflow-wrap:anywhere; }
+.invoice-page .totals-row > span:last-child { flex-shrink:0; white-space:nowrap; }
+.invoice-page .terbilang-section { margin:0 32px 16px; }
+.invoice-page .terbilang-section .terbilang-col { display:block; padding:14px 18px; }
+.invoice-page .installment-section { margin:0 32px 20px; }
+.invoice-page .installment-section h2 { font-size:11px; color:#051d76; margin:0 0 8px; }
+.invoice-page .installment-section table { width:100%; border-collapse:collapse; font-size:12px; }
+.invoice-page .installment-section th { text-align:left; color:#7783a8; font-size:10px; text-transform:uppercase; background:#fafbfd; padding:8px; border-bottom:2px solid #051d76; }
+.invoice-page .installment-section td { padding:8px; border-bottom:1px solid #e3e7f3; vertical-align:top; }
+.invoice-page .installment-section th:last-child,
+.invoice-page .installment-section td:last-child { text-align:right; white-space:nowrap; }
+
+/* Rekening berada di kiri ringkasan, dengan tinggi sesuai isinya. */
+.invoice-page .summary-section { justify-content:space-between; align-items:flex-start; gap:20px; }
+.invoice-page .summary-section > .banks { flex:1; min-width:0; margin:0; grid-template-columns:minmax(0,1fr); align-self:flex-start; }
+.invoice-page .summary-section > .banks .bank-card { overflow-wrap:anywhere; }
+.invoice-page .summary-section > .totals-box { width:360px; max-width:55%; }
+
+.invoice-page .payment-note-columns { display:grid; grid-template-columns:minmax(0,1.15fr) minmax(0,1fr); gap:20px; align-items:start; margin:0 32px 20px; }
+.invoice-page .payment-note-columns > .installment-section { margin:0; min-width:0; }
+.invoice-page .payment-note-columns > .invoice-note { margin:0; min-width:0; display:flex; flex-direction:column; align-items:flex-start; gap:12px; padding:14px; }
+.invoice-page .payment-note-columns .note-left { width:100%; min-width:0; }
+.invoice-page .payment-note-columns .qr-image { align-self:center; margin:0; }
+.invoice-page .payment-note-columns .installment-section th,
+.invoice-page .payment-note-columns .installment-section td { padding:7px 5px; }
+.invoice-page .payment-note-columns .installment-section table { font-size:11px; }
+.invoice-page .payment-note-columns.without-payments { grid-template-columns:minmax(0,1fr); }
+
+/* Susunan akhir: cicilan + nominal, terbilang, rekening, catatan. */
+.invoice-page .summary-section > .installment-section { flex:1; min-width:0; margin:0; }
+.invoice-page .summary-section > .installment-section table { font-size:11px; }
+.invoice-page .summary-section > .installment-section th,
+.invoice-page .summary-section > .installment-section td { padding:7px 5px; }
+.invoice-page .summary-section > .totals-box { margin-left:auto; }
+.invoice-page .sheet > .banks { display:flex; flex-wrap:wrap; gap:10px; }
+.invoice-page .sheet > .banks > .bank-card { flex:1 1 0; min-width:0; overflow-wrap:anywhere; }

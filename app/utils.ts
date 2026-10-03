@@ -261,3 +261,10 @@ export function saldoDepositRiwayat(history: {data: import("./types").InvoiceDat
   const used = history.reduce((sum, h) => h.data.nomorInvoice !== currentNumber && h.data.depositInvoice?.trim() === source.nomorInvoice.trim() ? sum + (h.data.deposit ?? 0) : sum, 0);
   return Math.max(0, hitungKelebihan(hitungBiaya(source).total, hitungDibayar(source)) - used);
 }
+
+export function ringkasanDepositRiwayat(history: {data: import("./types").InvoiceData}[], source: import("./types").InvoiceData) {
+  const awal = hitungKelebihan(hitungBiaya(source).total, hitungDibayar(source));
+  const pemakaian = history.filter(h => h.data.nomorInvoice !== source.nomorInvoice && h.data.depositInvoice?.trim() === source.nomorInvoice.trim() && (h.data.deposit ?? 0) > 0);
+  const terpakai = pemakaian.reduce((sum, h) => sum + (h.data.deposit ?? 0), 0);
+  return {awal, terpakai, tersedia: Math.max(0, awal - terpakai), pemakaian};
+}

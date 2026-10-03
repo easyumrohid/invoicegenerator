@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { exportCSV, downloadCSV } from "./storage";
 import { loadCloudHistory, deleteCloudInvoices, databaseError } from "./database";
 import type { InvoiceHistoryItem } from "./storage";
-import { hitungKelebihan, rupiah, ringkasanPembayaran, tanggalDalamRentang, labelPembayaran } from "./utils";
+import { ringkasanDepositRiwayat, hitungKelebihan, rupiah, ringkasanPembayaran, tanggalDalamRentang, labelPembayaran } from "./utils";
 
 interface Props {
   onLoadInvoice: (data: InvoiceHistoryItem) => void;
@@ -40,7 +40,10 @@ export default function InvoiceHistory({ onLoadInvoice, onClose }: Props) {
 
   const paymentTotals = ringkasanPembayaran(filtered.map(h => h.data));
   const totalRevenue = filtered.reduce((sum, h) => sum + h.dibayar, 0);
-  const totalOverpayment = filtered.reduce((sum, h) => sum + hitungKelebihan(h.total, h.dibayar), 0);
+  // Pemakaian harus dibaca dari seluruh riwayat, termasuk INV di luar filter tanggal/status.
+  const depositSummary = (h: InvoiceHistoryItem) => ringkasanDepositRiwayat(history, h.data);
+  const totalOverpayment = filtered.reduce((sum, h) => sum + depositSummary(h).tersedia, 0);
+  const totalDepositUsed = filtered.reduce((sum, h) => sum + depositSummary(h).terpakai, 0);
   const totalOutstanding = filtered.reduce((sum, h) => sum + Math.max(h.total - h.dibayar, 0), 0);
 
   const handleDelete = async (items: InvoiceHistoryItem[]) => {
@@ -175,8 +178,9 @@ export default function InvoiceHistory({ onLoadInvoice, onClose }: Props) {
             <div style={{ fontSize: "20px", fontWeight: 800, color: "#c0392b", marginTop: "4px" }}>{rupiah(totalOutstanding)}</div>
           </div>
           <div style={{ flex: 1, background: "#fff", padding: "14px", borderRadius: "10px", border: "1px solid #e3e7f3" }}>
-            <div style={{fontSize: "11px", color: "#7783a8"}}>Kelebihan Pembayaran</div>
+            <div style={{fontSize: "11px", color: "#7783a8"}}>Saldo Deposit Tersedia</div>
             <strong style={{color: "#9a6700"}}>{rupiah(totalOverpayment)}</strong>
+            <div style={{fontSize:"11px",marginTop:"4px",color:"#7783a8"}}>Deposit terpakai: {rupiah(totalDepositUsed)}</div>
           </div>
         </div>
 
@@ -256,7 +260,12 @@ export default function InvoiceHistory({ onLoadInvoice, onClose }: Props) {
                         <div style={{ fontSize: "11px", color: "#0f8a4d" }}>{rupiah(h.dibayar)}</div>
                       </td>
                       <td style={{ padding: "10px 8px", textAlign: "center" }}>{statusBadge(h.status)}
-                        {h.dibayar > h.total && <div style={{fontSize: "11px", color: "#9a6700", marginTop: "6px"}}>Kelebihan Pembayaran: {rupiah(hitungKelebihan(h.total, h.dibayar))}</div>}
+                        {(h.dibayar > h.total || depositSummary(h).terpakai > 0) && <div style={{fontSize: "11px", color: "#9a6700", marginTop: "6px", textAlign:"left"}}>
+                          <div>Kelebihan Awal: {rupiah(depositSummary(h).awal)}</div>
+                          <div>Deposit Terpakai: {rupiah(depositSummary(h).terpakai)}</div>
+                          <strong>Saldo Tersedia: {rupiah(depositSummary(h).tersedia)}</strong>
+                          {depositSummary(h).terpakai > depositSummary(h).awal && <div role="alert" style={{color:"#c0392b"}}>Pemakaian melebihi kelebihan awal. Periksa INV terkait.</div>}
+                        </div>}
                       </td>
                       <td style={{ padding: "10px 8px", textAlign: "center" }}>
                         <button
@@ -278,6 +287,10 @@ export default function InvoiceHistory({ onLoadInvoice, onClose }: Props) {
                       <tr>
                         <td colSpan={5} style={{ padding: "0 8px 12px", background: "#fafbfd" }}>
                           {paymentProgress(h)}
+                          {depositSummary(h).pemakaian.length > 0 && <div style={{fontSize:"12px",marginTop:"8px"}}>
+                            <strong>Deposit dipakai pada:</strong>
+                            {depositSummary(h).pemakaian.map(target => <div key={target.data.nomorInvoice}>{target.data.nomorInvoice} — {target.data.namaCustomer} — {rupiah(target.data.deposit ?? 0)}</div>)}
+                          </div>}
                           {(h.data.deposit ?? 0) > 0 && <p style={{fontSize:"12px",color:"#051d76"}}>Deposit digunakan: {rupiah(h.data.deposit ?? 0)} — dari {h.data.depositInvoice}</p>}
                           {h.data.riwayatPembayaran && h.data.riwayatPembayaran.length > 0 && (
                             <div style={{ marginTop: "8px" }}>
