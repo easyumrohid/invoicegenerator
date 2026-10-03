@@ -2,10 +2,10 @@
 
 import domtoimage from "dom-to-image-more";
 import jsPDF from "jspdf";
+import { paginatePDF } from "./pdf-pagination";
 
 // A4 at 96 DPI
 const A4_WIDTH_PX = 794;
-const A4_HEIGHT_PX = 1123;
 
 async function elementToPDF(
   element: HTMLDivElement,
@@ -73,8 +73,26 @@ async function elementToPDF(
   const width = A4_WIDTH_PX;
   const height = Math.ceil(wrapper.scrollHeight);
   const origin = wrapper.getBoundingClientRect().top;
-  const blocks = Array.from(wrapper.querySelectorAll("tr, .footer, .invoice-note, .banks, .sign"))
+  const blocks = Array.from(wrapper.querySelectorAll("tr, .head, .billed, .summary-section, .footer, .invoice-note, .banks, .signature-section, .sign, .combined-row, .terbilang-kwitansi, .amount-section"))
     .map(node => { const rect = node.getBoundingClientRect(); return {top: rect.top - origin, bottom: rect.bottom - origin}; });
+
+    // Range menghasilkan kotak per baris, termasuk Enter pada subdeskripsi.
+    // Blok yang terlalu tinggi boleh dilanjutkan, tetapi teks tetap dipisah antarbaris.
+    const walker = document.createTreeWalker(wrapper, NodeFilter.SHOW_TEXT);
+    let textNode: Node | null;
+    while ((textNode = walker.nextNode())) {
+      if (!textNode.textContent?.trim()) continue;
+      const range = document.createRange();
+      range.selectNodeContents(textNode);
+      for (const rect of Array.from(range.getClientRects())) {
+        if (rect.height > 0) blocks.push({top: rect.top - origin, bottom: rect.bottom - origin});
+      }
+      range.detach();
+    }
+    for (const node of Array.from(wrapper.querySelectorAll("img, thead"))) {
+      const rect = node.getBoundingClientRect();
+      blocks.push({top: rect.top - origin, bottom: rect.bottom - origin});
+    }
 
     const dataUrl = await domtoimage.toPng(wrapper, {
       width: width,
@@ -108,33 +126,31 @@ async function elementToPDF(
     await img.decode();
 
 
-    // Invoice normal dipertahankan utuh, termasuk footer. Sedikit kelebihan tinggi
-    // diperkecil secara proporsional; invoice panjang memakai batas antarblok.
-    if (height <= A4_HEIGHT_PX * 1.15) {
-      const imageWidth = Math.min(pdfWidth, pdfHeight * img.width / img.height);
-      pdf.addImage(dataUrl, "PNG", (pdfWidth - imageWidth) / 2, 0, imageWidth, img.height * imageWidth / img.width);
-    } else {
-      const scale = img.height / height;
-      const pagePixels = Math.ceil(img.width * pdfHeight / pdfWidth);
-      let top = 0;
-      while (top < img.height) {
-        let bottom = Math.min(top + pagePixels, img.height);
-        // Hindari memotong baris, catatan, rekening, dan footer/tanda tangan.
-        for (let pass = 0; pass < blocks.length; pass++) {
-          const crossing = blocks.filter(block => block.top * scale > top + 1 && block.top * scale < bottom && block.bottom * scale > bottom);
-          if (!crossing.length) break;
-          bottom = Math.floor(Math.min(...crossing.map(block => block.top * scale)));
-        }
-        if (top > 0) pdf.addPage();
-        const canvas = document.createElement("canvas");
-        canvas.width = img.width;
-        canvas.height = bottom - top;
-        const ctx = canvas.getContext("2d");
-        if (!ctx) throw new Error("Canvas tidak tersedia");
-        ctx.drawImage(img, 0, top, img.width, canvas.height, 0, 0, canvas.width, canvas.height);
-        pdf.addImage(canvas.toDataURL("image/png"), "PNG", 0, 0, pdfWidth, Math.min(pdfHeight, canvas.height * pdfWidth / img.width));
-        top = bottom;
+    const margin = 8;
+    const contentHeight = pdfHeight - margin * 2;
+    const scale = img.height / height;
+    const capacity = Math.floor(img.width * contentHeight / pdfWidth);
+    const pages = paginatePDF(img.height, capacity, blocks.map(b => ({
+      top: Math.floor(b.top * scale), bottom: Math.ceil(b.bottom * scale),
+    })));
+    for (const [index, page] of pages.entries()) {
+      if (index > 0) pdf.addPage();
+      const canvas = document.createElement("canvas");
+      canvas.width = img.width;
+      canvas.height = page.bottom - page.top;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) throw new Error("Canvas tidak tersedia");
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, page.top, img.width, canvas.height, 0, 0, canvas.width, canvas.height);
+      pdf.addImage(canvas.toDataURL("image/png"), "PNG", 0, margin, pdfWidth, canvas.height * pdfWidth / img.width);
+      if (pages.length > 1) {
+        pdf.setFontSize(8);
+        pdf.setTextColor(100);
+        pdf.text(`${index + 1} / ${pages.length}`, pdfWidth - 8, pdfHeight - 3, {align: "right"});
       }
+      canvas.width = 0;
+      canvas.height = 0;
     }
 
     pdf.save(fileName);
